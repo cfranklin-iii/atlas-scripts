@@ -31,4 +31,4 @@ sudo apt install -y &>/dev/null \
     wget \
     build-essential
 
-echo -e "\n${GREEN}Installation complete!${NC}"
+echo -e "${GREEN}Software installation complete!${NC}"
