@@ -25,7 +25,8 @@ if command -v fish &> /dev/null; then
 
     cp -r "$DOTFILES_DIR/fish/config.fish" "$HOME/.config/fish/config.fish"
     cp -r "$DOTFILES_DIR/fish/aliases.fish" "$fish_config/aliases.fish"
-    cp -r "$DOTFILES_DIR/fish/functions/" "$HOME/.config/fish/functions/"
+    mkdir -p "$HOME/.config/fish/functions"
+    cp -r "$DOTFILES_DIR/fish/functions/"* "$HOME/.config/fish/functions/"
     echo -e "${GREEN} Fish config and functions loaded, aliases copied to: $fish_config/aliases.fish${NC}"
 else
     echo -e "${RED} ERROR: Fish shell not installed, skipping.${NC}"

@@ -11,11 +11,11 @@ NC='\033[0m'
 echo -e "${YELLOW}Updating system packages...${NC}"
 # Note: This uses 'apt', assuming a Debian/Ubuntu-based distribution.
 # If you are on Arch Linux, change this to 'sudo pacman -Syu'
-sudo apt update && sudo apt full-upgrade -y
+sudo pacman -Syu --noconfirm
 
 echo -e "\n${YELLOW}Installing software...${NC}"
 # Add or remove packages in this list as needed
-sudo apt install -y \
+sudo pacman -S --noconfirm \
     git \
     fish \
     tree \
@@ -23,6 +23,5 @@ sudo apt install -y \
     fastfetch \
     curl \
     wget \
-    build-essential \
 
 echo -e "\n${GREEN}Installation complete!${NC}"
