@@ -18,7 +18,7 @@ echo "Pulling fish configs from $REPO_DIR..."
 
 # Fish Setup
 # Should check if fish is installed, if not send an error message
-if command -v fish &> /dev/null; then
+if command -v fish &>/dev/null; then
     echo -e "\n${YELLOW}Setting up fish shell...${NC}"
     fish_config="$HOME/.config/fish/conf.d"
     mkdir -p "$fish_config"
