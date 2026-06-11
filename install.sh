@@ -23,6 +23,6 @@ sudo apt install -y \
     fastfetch \
     curl \
     wget \
-    build-essential \
+    build-essential
 
 echo -e "\n${GREEN}Installation complete!${NC}"

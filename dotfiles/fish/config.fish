@@ -1,9 +1,8 @@
-source $HOME/.config/fish/conf.d/aliases.fish
 set HISTSIZE 1000
 set HISTCONTROL ignoreboth
 
 function fish_greeting
-    echo "   ===   Logging in to $hostname as $USER...   ==="
+    echo "   ===   Logging in to "(hostname)" as $USER...   ==="
 
     set greetings \
 "   ===   Loading terminal... Don't fuck anything up :)   ===   " \
@@ -18,5 +17,9 @@ function fish_greeting
     echo " $random_greet "
 end
 
-exec neofetch || exec fastfetch
+if command -q fastfetch
+    fastfetch
+else if command -q neofetch
+    neofetch
+end
 

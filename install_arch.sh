@@ -22,6 +22,6 @@ sudo pacman -S --noconfirm \
     btop \
     fastfetch \
     curl \
-    wget \
+    wget
 
 echo -e "\n${GREEN}Installation complete!${NC}"
