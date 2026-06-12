@@ -2,11 +2,11 @@ set HISTSIZE 1000
 set HISTCONTROL ignoreboth
 
 function fish_greeting
-    echo "   ===   Logging in to "(hostname)" as $USER...   ==="
+    echo " Logging in to '"(hostname)"' as: $USER..."
 
     set greetings \
-"   ===   Loading terminal... Don't fuck anything up :)   ===   " \
-"   ===   Warning: Unauthorized access detected. Just kidding, Welcome back.   ===   " \
+" Loading terminal... Don't fuck anything up :)" \
+" Warning: Unauthorized access detected. Just kidding, Welcome back." \
 "   ===   Getting ready for some bullshit...   ===   " \
 "   ===   Connecting to System Secure Shell...   ===
      ===   Making sure everything is ready...   ===

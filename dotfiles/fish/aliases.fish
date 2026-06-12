@@ -50,5 +50,4 @@ alias dcompdown 'docker compose down'
 alias dstats 'docker stats'
 
 # ===== System =====
-alias swapreset 'sudo swapoff -a && sleep 3 && sudo swapon -a'
 alias swapresetwait 'sudo swapoff -a && sleep 15 && sudo swapon -a'
