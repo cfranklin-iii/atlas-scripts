@@ -7,10 +7,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 if command -v nvidia-smi &> /dev/null; then
-    echo "${GREEN}NVIDIA drivers are already installed.${NC}"
-    read -p "${GREEN}Do you want to ${YELLOW}reinstall the drivers, install the NVIDIA Container Toolkit or ${RED}exit?${NC} (1/2/3): " answer
+    echo -e "${GREEN}NVIDIA drivers are already installed.${NC}"
+    echo -e -n "${GREEN}Do you want to ${YELLOW}reinstall the drivers, install the NVIDIA Container Toolkit or ${RED}exit?${NC} (1/2/3): " && read  answer
     if [[ $answer == "1" ]]; then
-        echo "${YELLOW}Reinstalling NVIDIA drivers...${NC}"
+        echo -e "${YELLOW}Reinstalling NVIDIA drivers...${NC}"
         # Pull the drivers from nvidia.com
         wget https://us.download.nvidia.com/XFree86/Linux-x86_64/595.80/NVIDIA-Linux-x86_64-595.80.run
         # Make it executable
@@ -19,41 +19,42 @@ if command -v nvidia-smi &> /dev/null; then
         sudo apt update &>/dev/null
         sudo apt install -y build-essential dkms &>/dev/null
         # Verify package installation
-        echo "${YELLOW}Verifying package installation...${NC}"
+        echo -e "${YELLOW}Verifying package installation...${NC}"
         which make
         make --version
         gcc --version
         # Run the driver installation
-        echo "${YELLOW}Running NVIDIA driver installation...${NC}"
-        ./NVIDIA-Linux-x86_64-595.80.run
+        echo -e "${YELLOW}Running NVIDIA driver installation...${NC}"
+        sudo ./NVIDIA-Linux-x86_64-595.80.run
     elif [[ $answer == "2" ]]; then
-        echo "${YELLOW}Installing NVIDIA Container Toolkit...${NC}"
+        echo -e "${YELLOW}Installing NVIDIA Container Toolkit...${NC}"
         # For Debian (Trixie) Containers/Docker
         curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
-        gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        sudo gpg --dearmor -yes -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
         curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
         sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-        tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-        apt install -y nvidia-container-toolkit
-        nvidia-ctk runtime configure --runtime=docker
-        systemctl restart docker
+        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        sudo apt-get update
+        sudo apt-get install -y nvidia-container-toolkit
+        sudo nvidia-ctk runtime configure --runtime=docker
+        sudo systemctl restart docker
     else
-        echo "${RED}Exiting.${NC}"
+        echo -e "${RED}Exiting.${NC}"
         exit 0
     fi
 else
     # Logic for when nvidia-smi is not found
-    read -p "${YELLOW}NVIDIA drivers not found. Install drivers (1) or exit (2)? ${NC}" answer2
+    echo -e -n "${YELLOW}NVIDIA drivers not found. Install drivers (1) or exit (2)? ${NC} " && read answer2
     if [[ $answer2 == "1" ]]; then
-        echo "${YELLOW}Installing drivers...${NC}"
+        echo -e "${YELLOW}Installing drivers...${NC}"
         wget https://us.download.nvidia.com/XFree86/Linux-x86_64/595.80/NVIDIA-Linux-x86_64-595.80.run
         chmod +x NVIDIA-Linux-x86_64-595.80.run
-        echo "${YELLOW}Updating package list...${NC}"
-        apt update
-        echo "${YELLOW}Installing essential packages...${NC}"
-        apt install -y build-essential dkms
-        echo "${YELLOW}Running NVIDIA driver installation...${NC}"
-        ./NVIDIA-Linux-x86_64-595.80.run
+        echo -e "${YELLOW}Updating package list...${NC}"
+        sudo apt update
+        echo -e "${YELLOW}Installing essential packages...${NC}"
+        sudo apt install -y build-essential dkms
+        echo -e "${YELLOW}Running NVIDIA driver installation...${NC}"
+        sudo ./NVIDIA-Linux-x86_64-595.80.run
     else
         exit 0
     fi

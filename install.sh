@@ -21,7 +21,7 @@ fi
 
 echo -e "\n${YELLOW}Installing software...${NC}"
 # Add or remove packages in this list as needed
-sudo apt install -y &>/dev/null \
+sudo apt install -y \
     git \
     fish \
     tree \
@@ -29,6 +29,6 @@ sudo apt install -y &>/dev/null \
     fastfetch \
     curl \
     wget \
-    build-essential
+    build-essential &>/dev/null
 
 echo -e "${GREEN}Software installation complete!${NC}"

@@ -1,3 +1,3 @@
 function swapreset
-    swapoff -a && &>1 /dev/null && swapon -a
+    sudo swapoff -a; and sudo swapon -a
 end
