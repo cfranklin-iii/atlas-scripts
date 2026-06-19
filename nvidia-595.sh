@@ -7,10 +7,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 if command -v nvidia-smi &> /dev/null; then
-    echo "NVIDIA drivers are already installed."
-    read -p "Do you want to ${YELLOW}reinstall the drivers, install the NVIDIA Container Toolkit or ${RED}exit?${NC} (1/2/3): " answer
+    echo "${GREEN}NVIDIA drivers are already installed.${NC}"
+    read -p "${GREEN}Do you want to ${YELLOW}reinstall the drivers, install the NVIDIA Container Toolkit or ${RED}exit?${NC} (1/2/3): " answer
     if [[ $answer == "1" ]]; then
-        echo "Reinstalling NVIDIA drivers..."
+        echo "${YELLOW}Reinstalling NVIDIA drivers...${NC}"
         # Pull the drivers from nvidia.com
         wget https://us.download.nvidia.com/XFree86/Linux-x86_64/595.80/NVIDIA-Linux-x86_64-595.80.run
         # Make it executable
@@ -19,15 +19,15 @@ if command -v nvidia-smi &> /dev/null; then
         sudo apt update &>/dev/null
         sudo apt install -y build-essential dkms &>/dev/null
         # Verify package installation
-        echo "Verifying package installation..."
+        echo "${YELLOW}Verifying package installation...${NC}"
         which make
         make --version
         gcc --version
         # Run the driver installation
-        echo "Running NVIDIA driver installation..."
+        echo "${YELLOW}Running NVIDIA driver installation...${NC}"
         ./NVIDIA-Linux-x86_64-595.80.run
     elif [[ $answer == "2" ]]; then
-        echo "Installing NVIDIA Container Toolkit..."
+        echo "${YELLOW}Installing NVIDIA Container Toolkit...${NC}"
         # For Debian (Trixie) Containers/Docker
         curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
         gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
@@ -38,21 +38,21 @@ if command -v nvidia-smi &> /dev/null; then
         nvidia-ctk runtime configure --runtime=docker
         systemctl restart docker
     else
-        echo "Exiting."
+        echo "${RED}Exiting.${NC}"
         exit 0
     fi
 else
     # Logic for when nvidia-smi is not found
-    read -p "NVIDIA drivers not found. Install drivers (1) or exit (2)? " answer2
+    read -p "${YELLOW}NVIDIA drivers not found. Install drivers (1) or exit (2)? ${NC}" answer2
     if [[ $answer2 == "1" ]]; then
-        echo "Installing drivers..."
+        echo "${YELLOW}Installing drivers...${NC}"
         wget https://us.download.nvidia.com/XFree86/Linux-x86_64/595.80/NVIDIA-Linux-x86_64-595.80.run
         chmod +x NVIDIA-Linux-x86_64-595.80.run
-        echo "Updating package list..."
+        echo "${YELLOW}Updating package list...${NC}"
         apt update
-        echo "Installing essential packages..."
+        echo "${YELLOW}Installing essential packages...${NC}"
         apt install -y build-essential dkms
-        echo "Running NVIDIA driver installation..."
+        echo "${YELLOW}Running NVIDIA driver installation...${NC}"
         ./NVIDIA-Linux-x86_64-595.80.run
     else
         exit 0
