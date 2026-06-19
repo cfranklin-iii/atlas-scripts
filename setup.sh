@@ -31,3 +31,13 @@ if command -v fish &>/dev/null; then
 else
     echo -e "${RED} ERROR: Fish shell not installed, skipping.${NC}"
 fi
+
+if command -v git &>/dev/null; then
+    echo -e "\n${YELLOW}Applying git config settings...${NC}"
+    git config --global user.email "charlesfranklin0622@gmail.com"
+    git config --global user.name "cfranklin-iii"
+    git config --global init.defaultBranch main
+    echo -e "${GREEN}Git config applied.${NC}"
+else
+    echo -e "${RED} ERROR: Git not installed, skipping.${NC}"
+fi
