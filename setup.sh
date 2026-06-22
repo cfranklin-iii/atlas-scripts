@@ -13,11 +13,9 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-
-echo "Pulling fish configs from $REPO_DIR..."
+echo -e "${YELLOW}Pulling fish configs from $REPO_DIR...${NC}"
 
 # Fish Setup
-# Should check if fish is installed, if not send an error message
 if command -v fish &>/dev/null; then
     echo -e "\n${YELLOW}Setting up fish shell...${NC}"
     fish_config="$HOME/.config/fish/conf.d"
@@ -27,17 +25,21 @@ if command -v fish &>/dev/null; then
     cp -r "$DOTFILES_DIR/fish/aliases.fish" "$fish_config/aliases.fish"
     mkdir -p "$HOME/.config/fish/functions"
     cp -r "$DOTFILES_DIR/fish/functions/"* "$HOME/.config/fish/functions/"
-    echo -e "${GREEN} Fish config and functions loaded, aliases copied to: $fish_config/aliases.fish${NC}"
+    echo -e "${GREEN}Fish config and functions loaded, aliases copied to: $fish_config/aliases.fish${NC}"
 else
-    echo -e "${RED} ERROR: Fish shell not installed, skipping.${NC}"
+    echo -e "${RED}ERROR: Fish shell not installed, skipping.${NC}"
 fi
 
 if command -v git &>/dev/null; then
     echo -e "\n${YELLOW}Applying git config settings...${NC}"
-    git config --global user.email "charlesfranklin0622@gmail.com"
-    git config --global user.name "cfranklin-iii"
+    if ! git config --global user.email > /dev/null; then
+        git config --global user.email "charlesfranklin0622@gmail.com"
+    fi
+    if ! git config --global user.name > /dev/null; then
+        git config --global user.name "cfranklin-iii"
+    fi
     git config --global init.defaultBranch main
     echo -e "${GREEN}Git config applied.${NC}"
 else
-    echo -e "${RED} ERROR: Git not installed, skipping.${NC}"
+    echo -e "${RED}ERROR: Git not installed, skipping.${NC}"
 fi
