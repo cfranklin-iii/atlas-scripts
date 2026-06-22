@@ -21,14 +21,24 @@ fi
 
 echo -e "\n${YELLOW}Installing software...${NC}"
 # Add or remove packages in this list as needed
-sudo apt install -y \
-    git \
-    fish \
-    tree \
-    btop \
-    fastfetch \
-    curl \
-    wget \
-    build-essential &>/dev/null
+packages=(
+    git
+    fish
+    tree
+    btop
+    fastfetch
+    curl
+    wget
+    build-essential
+)
+
+for pkg in "${packages[@]}"; do
+    if output=$(sudo apt install -y "$pkg" 2>&1); then
+        echo -e "${GREEN}Successfully installed $pkg!${NC}"
+    else
+        echo -e "${RED}Failed to install $pkg.${NC}"
+        echo -e "${RED}Details: $output${NC}"
+    fi
+done
 
 echo -e "${GREEN}Software installation complete!${NC}"
