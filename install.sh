@@ -9,10 +9,25 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}Updating system packages...${NC}"
-# Note: This uses 'apt', assuming a Debian/Ubuntu-based distribution.
-# If you are on Arch Linux, change this to 'sudo pacman -Syu'
-if sudo apt update &>/dev/null && sudo apt full-upgrade -y &>/dev/null; then
+echo -e "${YELLOW}Detecting package manager...${NC}"
+
+if command -v apt &> /dev/null; then
+    PKG_MANAGER="apt"
+    UPDATE_CMD="sudo apt update && sudo apt full-upgrade -y"
+    INSTALL_CMD="sudo apt install -y"
+    PACKAGES=(git fish tree btop fastfetch curl wget build-essential)
+elif command -v pacman &> /dev/null; then
+    PKG_MANAGER="pacman"
+    UPDATE_CMD="sudo pacman -Syu --noconfirm"
+    INSTALL_CMD="sudo pacman -S --noconfirm"
+    PACKAGES=(git fish tree btop fastfetch curl wget base-devel)
+else
+    echo -e "${RED}Unsupported package manager. Please install packages manually.${NC}"
+    exit 1
+fi
+
+echo -e "${YELLOW}Updating system packages using $PKG_MANAGER...${NC}"
+if eval "$UPDATE_CMD" &>/dev/null; then
     echo -e "${GREEN}System packages updated successfully!${NC}"
 else
     echo -e "${RED}Failed to update system packages. Please check your network connection and package manager settings.${NC}"
@@ -20,25 +35,12 @@ else
 fi
 
 echo -e "\n${YELLOW}Installing software...${NC}"
-# Add or remove packages in this list as needed
-packages=(
-    git
-    fish
-    tree
-    btop
-    fastfetch
-    curl
-    wget
-    build-essential
-)
+if output=$(eval "$INSTALL_CMD ${PACKAGES[*]}" 2>&1); then
+    echo -e "${GREEN}Successfully installed: ${PACKAGES[*]}!${NC}"
+else
+    echo -e "${RED}Failed to install packages.${NC}"
+    echo -e "${RED}Details: $output${NC}"
+    exit 1
+fi
 
-for pkg in "${packages[@]}"; do
-    if output=$(sudo apt install -y "$pkg" 2>&1); then
-        echo -e "${GREEN}Successfully installed $pkg!${NC}"
-    else
-        echo -e "${RED}Failed to install $pkg.${NC}"
-        echo -e "${RED}Details: $output${NC}"
-    fi
-done
-
-echo -e "${GREEN}Software installation complete!${NC}"
+echo -e "\n${GREEN}Installation complete!${NC}"
