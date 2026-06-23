@@ -13,7 +13,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${YELLOW}Pulling fish configs from $REPO_DIR...${NC}"
+echo -e "Pulling fish configs from ${YELLOW}$REPO_DIR...${NC}"
 
 # Fish Setup
 if command -v fish &>/dev/null; then
