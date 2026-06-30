@@ -1,6 +1,3 @@
-set HISTSIZE 1000
-set HISTCONTROL ignoreboth
-
 function fish_greeting
     echo " Logging in to '"(hostname)"' as: $USER..."
 
@@ -11,15 +8,13 @@ function fish_greeting
 "   ===   Connecting to System Secure Shell...   ===
      ===   Making sure everything is ready...   ===
        ===   Flipping pancakes and bacon...   ===
-          ===   Terminal Runtime Loaded.   ===" \
-    
+          ===   Terminal Runtime Loaded.   ==="
+
     set random_greet $greetings[(math (random 1 (count $greetings)))]
     echo " $random_greet "
 end
 
-if command -q fastfetch
+if status is-interactive; and command -q fastfetch
     fastfetch
-else if command -q neofetch
-    neofetch
 end
 

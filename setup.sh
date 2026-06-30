@@ -30,13 +30,27 @@ else
     echo -e "${RED}ERROR: Fish shell not installed, skipping.${NC}"
 fi
 
+# Fastfetch Setup
+if command -v fastfetch &>/dev/null; then
+    echo -e "\n${YELLOW}Setting up fastfetch...${NC}"
+    fastfetch_config="$HOME/.config/fastfetch"
+    mkdir -p "$fastfetch_config"
+
+    cp -r "$DOTFILES_DIR/fastfetch/config.jsonc" "$fastfetch_config/config.jsonc"
+    echo -e "${GREEN}Fastfetch config loaded to: $fastfetch_config/config.jsonc${NC}"
+else
+    echo -e "${RED}ERROR: Fastfetch not installed, skipping.${NC}"
+fi
+
 if command -v git &>/dev/null; then
     echo -e "\n${YELLOW}Applying git config settings...${NC}"
     if ! git config --global user.email > /dev/null; then
-        git config --global user.email "charlesfranklin0622@gmail.com"
+        echo -n "Enter Git email: " && read -r git_email
+        git config --global user.email "$git_email"
     fi
     if ! git config --global user.name > /dev/null; then
-        git config --global user.name "cfranklin-iii"
+        echo -n "Enter Git name: " && read -r git_name
+        git config --global user.name "$git_name"
     fi
     git config --global init.defaultBranch main
     echo -e "${GREEN}Git config applied.${NC}"
