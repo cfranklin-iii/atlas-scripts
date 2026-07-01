@@ -98,23 +98,23 @@
         },
         {
             "type": "de",
-            "key": "│ ├󰧨 DE",
-            "keyColor": "cyan"
+            "key": "│ ├ 🖼️  DE",
+            "keyColor": "blue"
         },
         {
             "type": "wm",
-            "key": "│ ├󱂬 WM",
-            "keyColor": "cyan"
+            "key": "│ ├ 🪟 WM",
+            "keyColor": "blue"
         },
         {
             "type": "terminal",
-            "key": "│ ├󰆍 TERMINAL",
-            "keyColor": "cyan"
+            "key": "│ ├ ⌨️  TERMINAL",
+            "keyColor": "blue"
         },
         {
             "type": "localip",
-            "key": "│ └󰩟 LOCAL IP",
-            "keyColor": "cyan"
+            "key": "│ └ 🌐 LOCAL IP",
+            "keyColor": "blue"
         },
         {
             "type": "custom",
