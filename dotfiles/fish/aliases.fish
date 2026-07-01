@@ -47,3 +47,9 @@ alias dcomp 'docker compose'
 alias dcompup 'docker compose up -d'
 alias dcompdown 'docker compose down'
 alias dstats 'docker stats'
+
+# Load machine-specific aliases if they exist.
+# Kept outside conf.d/ so fish does not auto-source it a second time.
+if test -f "$__fish_config_dir/aliases.local.fish"
+    source "$__fish_config_dir/aliases.local.fish"
+end

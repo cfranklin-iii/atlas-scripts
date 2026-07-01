@@ -18,3 +18,8 @@ if status is-interactive; and command -q fastfetch
     fastfetch
 end
 
+# Load machine-specific config overrides if they exist.
+if test -f "$__fish_config_dir/config.local.fish"
+    source "$__fish_config_dir/config.local.fish"
+end
+
