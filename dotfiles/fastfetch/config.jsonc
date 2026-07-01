@@ -20,28 +20,28 @@
         },
         {
             "type": "os",
-            "key": "│ ├󰋄 OS",
-            "keyColor": "magenta"
+            "key": "│ ├ 🐧 OS",
+            "keyColor": "green"
         },
         {
             "type": "kernel",
-            "key": "│ ├󰒔 KERNEL",
-            "keyColor": "magenta"
+            "key": "│ ├ ⚙️  KERNEL",
+            "keyColor": "green"
         },
         {
             "type": "uptime",
-            "key": "│ ├󰅐 UPTIME",
-            "keyColor": "magenta"
+            "key": "│ ├ ⏱️  UPTIME",
+            "keyColor": "green"
         },
         {
             "type": "packages",
-            "key": "│ ├󰏖 PACKAGES",
-            "keyColor": "magenta"
+            "key": "│ ├ 📦 PACKAGES",
+            "keyColor": "green"
         },
         {
             "type": "shell",
-            "key": "│ └󰞷 SHELL",
-            "keyColor": "magenta"
+            "key": "│ └ 🐚 SHELL",
+            "keyColor": "green"
         },
         {
             "type": "custom",
@@ -54,38 +54,38 @@
         },
         {
             "type": "host",
-            "key": "│ ├󰌢 HOST",
-            "keyColor": "blue"
+            "key": "│ ├ 💻 HOST",
+            "keyColor": "yellow"
         },
         {
             "type": "cpu",
-            "key": "│ ├ CPU",
-            "keyColor": "blue"
+            "key": "│ ├ 🧠 CPU",
+            "keyColor": "yellow"
         },
         {
             "type": "gpu",
-            "key": "│ ├󰍛 GPU",
-            "keyColor": "blue"
+            "key": "│ ├ 🎮 GPU",
+            "keyColor": "yellow"
         },
         {
             "type": "display",
-            "key": "│ ├󰹑 DISPLAY",
-            "keyColor": "blue"
+            "key": "│ ├ 🖥️  DISPLAY",
+            "keyColor": "yellow"
         },
         {
             "type": "memory",
-            "key": "│ ├󰍛 MEMORY",
-            "keyColor": "blue"
+            "key": "│ ├ 💾 MEMORY",
+            "keyColor": "yellow"
         },
         {
             "type": "swap",
-            "key": "│ ├󰓡 SWAP",
-            "keyColor": "blue"
+            "key": "│ ├ 🔄 SWAP",
+            "keyColor": "yellow"
         },
         {
             "type": "disk",
-            "key": "│ └󰋊 DISK",
-            "keyColor": "blue"
+            "key": "│ └ 💿 DISK",
+            "keyColor": "yellow"
         },
         {
             "type": "custom",
