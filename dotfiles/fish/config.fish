@@ -1,9 +1,9 @@
 function fish_greeting
-    echo "   ===   Logging in to '"(hostname)"' as '$USER'...   ===   "
+    echo "   ===   Logging in to '"(hostname)"' as '$USER'...   ==="
 
     set greetings \
-"   ===   Loading fish $FISH_VERSION... Don't fuck anything up :)   ===   " \
-"   ===   Warning: Unauthorized access detected. Just kidding, Welcome back, $USER.   ===   " \
+"   ===   Loading fish $FISH_VERSION... Don't fuck anything up :)   ===" \
+"   ===   Warning: Unauthorized access detected. Just kidding, Welcome back, $USER.   ===" \
 "   ===   Getting ready for some bullshit...   ===   " \
 "   ===   Connecting to System Secure Shell...   ===
      ===   Making sure everything is ready...   ===
