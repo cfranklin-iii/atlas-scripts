@@ -20,28 +20,28 @@
         },
         {
             "type": "os",
-            "key": "│ ├ 🐧 OS",
-            "keyColor": "green"
+            "key": "│ ├ OS",
+            "keyColor": "cyan"
         },
         {
             "type": "kernel",
-            "key": "│ ├ ⚙️  KERNEL",
-            "keyColor": "green"
+            "key": "│ ├ KERNEL",
+            "keyColor": "cyan"
         },
         {
             "type": "uptime",
-            "key": "│ ├ ⏱️  UPTIME",
-            "keyColor": "green"
+            "key": "│ ├ UPTIME",
+            "keyColor": "cyan"
         },
         {
             "type": "packages",
-            "key": "│ ├ 📦 PACKAGES",
-            "keyColor": "green"
+            "key": "│ ├ PACKAGES",
+            "keyColor": "cyan"
         },
         {
             "type": "shell",
-            "key": "│ └ 🐚 SHELL",
-            "keyColor": "green"
+            "key": "│ └ SHELL",
+            "keyColor": "cyan"
         },
         {
             "type": "custom",
@@ -54,38 +54,38 @@
         },
         {
             "type": "host",
-            "key": "│ ├ 💻 HOST",
-            "keyColor": "yellow"
+            "key": "│ ├ HOST",
+            "keyColor": "blue"
         },
         {
             "type": "cpu",
-            "key": "│ ├ 🧠 CPU",
-            "keyColor": "yellow"
+            "key": "│ ├ CPU",
+            "keyColor": "blue"
         },
         {
             "type": "gpu",
-            "key": "│ ├ 🎮 GPU",
-            "keyColor": "yellow"
+            "key": "│ ├ GPU",
+            "keyColor": "blue"
         },
         {
             "type": "display",
-            "key": "│ ├ 🖥️  DISPLAY",
-            "keyColor": "yellow"
+            "key": "│ ├ DISPLAY",
+            "keyColor": "blue"
         },
         {
             "type": "memory",
-            "key": "│ ├ 💾 MEMORY",
-            "keyColor": "yellow"
+            "key": "│ ├ MEMORY",
+            "keyColor": "blue"
         },
         {
             "type": "swap",
-            "key": "│ ├ 🔄 SWAP",
-            "keyColor": "yellow"
+            "key": "│ ├ SWAP",
+            "keyColor": "blue"
         },
         {
             "type": "disk",
-            "key": "│ └ 💿 DISK",
-            "keyColor": "yellow"
+            "key": "│ └ DISK",
+            "keyColor": "blue"
         },
         {
             "type": "custom",
@@ -98,23 +98,23 @@
         },
         {
             "type": "de",
-            "key": "│ ├ 🖼️  DE",
-            "keyColor": "blue"
+            "key": "│ ├ DE",
+            "keyColor": "yellow"
         },
         {
             "type": "wm",
-            "key": "│ ├ 🪟 WM",
-            "keyColor": "blue"
+            "key": "│ ├ WM",
+            "keyColor": "yellow"
         },
         {
             "type": "terminal",
-            "key": "│ ├ ⌨️  TERMINAL",
-            "keyColor": "blue"
+            "key": "│ ├ TERMINAL",
+            "keyColor": "yellow"
         },
         {
             "type": "localip",
-            "key": "│ └ 🌐 LOCAL IP",
-            "keyColor": "blue"
+            "key": "│ └ LOCAL IP",
+            "keyColor": "yellow"
         },
         {
             "type": "custom",
