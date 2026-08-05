@@ -1,19 +1,17 @@
-# Atlas Scripts (v1.6)
+# Atlas Scripts (v1.66)
 
-=== Manifest ===
-
+### Overview
 `lib/common.sh`
  - Shared helpers sourced by every script: colors, `info`/`ok`/`err` log functions,
-   and `detect_pkg_manager` — keeps the scripts DRY and consistent.
+   and `detect_pkg_manager` — keeps the scripts consistent.
 
 `setup.sh`
- - Checks if fish is installed
- - If not, errors
- - If yes, pushes functions, aliases, and config.fish to local
+ - Checks if fish is installed and errors if not
+ - Pushes functions, aliases, and config.fish to local
  - Backs up any existing configs to a timestamped `.bak` (never clobbers a previous backup)
  - Creates `config.local.fish` / `aliases.local.fish` for machine-specific overrides (never overwritten)
  - Deploys a custom **boxed-style** fastfetch config to `~/.config/fastfetch/config.jsonc`
- - Configures git global user name and email (if not already set; skips prompts when non-interactive)
+ - Prompts & configures git global user name and email if not already set
 
 `install.sh`
  - Automatically detects package manager (`apt` or `pacman`)
@@ -25,8 +23,8 @@
  - Robust error handling: uses `trap` for automatic cleanup of `.run` files
  - Smart guards: detects system type to provide tailored instructions for Container Toolkit (apt-native, Arch/AUR instructions)
 
-### ✨ Features
-- **Modern Fastfetch:** Custom UI-like boxed configuration with Nerd Font icons.
+### Key Features
+- **Modern Fastfetch:** Custom UI-like boxed configuration with pre-selected colors from `common.sh`
 - **Fish Integration:** Interactive-only greeting guard to prevent `scp`/`rsync` breakages.
 - **Local Overrides:** Drop personal settings in `~/.config/fish/config.local.fish` and
   aliases in `~/.config/fish/aliases.local.fish`. These are auto-sourced by the managed
@@ -49,8 +47,3 @@ set -gx EDITOR nvim
 
 `setup.sh` creates empty templates for these on first run and never touches them again,
 so re-running the script won't wipe your customizations.
-
-### Notes for Future Versions / Things to Add:
-- Add support for other package managers like `dnf` or `zypper`.
-- Add an uninstaller or cleanup script to remove dotfiles/packages easily.
-- Make NVIDIA driver version dynamically fetch the latest release version instead of hardcoding.
