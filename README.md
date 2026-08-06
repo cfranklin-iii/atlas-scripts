@@ -18,8 +18,8 @@
  - Updates the system and installs core packages (`git`, `fish`, `tree`, `btop`, `fastfetch`, etc.)
  - Uses safe array-based commands (no `eval`) and `--needed` flags for efficiency
 
-`nvidia-595.sh`
- - Interactive script for installing NVIDIA drivers (v595.80) and Container Toolkit
+`nvidia.sh`
+ - Interactive script for installing NVIDIA drivers (v595.91.07, Aug. 4th) and Container Toolkit
  - Robust error handling: uses `trap` for automatic cleanup of `.run` files
  - Smart guards: detects system type to provide tailored instructions for Container Toolkit (apt-native, Arch/AUR instructions)
 

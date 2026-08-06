@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-VERSION="595.80"
+VERSION="595.91.07"
 RUN_FILE="NVIDIA-Linux-x86_64-${VERSION}.run"
 URL="https://us.download.nvidia.com/XFree86/Linux-x86_64/${VERSION}/${RUN_FILE}"
 
