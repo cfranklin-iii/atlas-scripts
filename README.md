@@ -1,4 +1,4 @@
-# Atlas Scripts (v1.66)
+# Atlas Scripts (v1.68)
 
 ### Overview
 `lib/common.sh`

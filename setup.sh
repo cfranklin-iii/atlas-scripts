@@ -8,7 +8,7 @@ CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
 # Backup an existing file to a timestamped .bak, then install the new one.
 install_file() {
     local src="$1" dest="$2"
-    [ -f "$dest" ] && cp "$dest" "$dest.bak.$(date +%Y%m%d%H%M%S)" \
+    [ -f "$dest" ] && cp "$dest" "$dest.bak.$(date +%m%d%H%M%S)" \
         && info "Backed up $dest"
     cp "$src" "$dest"
 }
