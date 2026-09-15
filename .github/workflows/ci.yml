@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  SCRIPTS: install.sh setup.sh nvidia.sh restore.sh lib/common.sh
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -17,11 +20,11 @@ jobs:
           sudo apt-get install -y shellcheck fish fastfetch
 
       - name: Shellcheck
-        run: shellcheck --severity=style install.sh setup.sh nvidia.sh restore.sh lib/common.sh
+        run: shellcheck --severity=style $SCRIPTS
 
       - name: Bash syntax
         run: |
-          for f in install.sh setup.sh nvidia.sh restore.sh lib/common.sh; do
+          for f in $SCRIPTS; do
               bash -n "$f"
           done
 
@@ -47,6 +50,90 @@ jobs:
           grep -qF "v$driver" README.md \
               || { echo "README does not mention nvidia.sh driver $driver"; exit 1; }
 
+      - name: Menu token parser
+        # The menu itself needs a tty, so stdin cannot drive it from CI. The
+        # token grammar is where the bugs would be, so test that directly.
+        # common.sh turns on `set -e`, hence the `|| rc=$?` around the calls
+        # that are meant to fail.
+        run: |
+          bash -c '
+          . lib/common.sh
+          ms_load "core|Sets|c|git curl" "git|Pkgs||" "curl|Pkgs||" "tree|Pkgs||"
+
+          picked() { local i o=""; for i in "${!MS_KEY[@]}"; do
+              if [ -z "${MS_MEMBERS[$i]}" ] && [ "${MS_STATE[$i]}" -eq 1 ]; then o="$o ${MS_KEY[$i]}"; fi
+          done; echo "${o# }"; }
+          want() { if [ "$(picked)" != "$1" ]; then echo "$2: got [$(picked)], wanted [$1]"; exit 1; fi; }
+
+          want "git curl tree" "rows should start pre-selected"
+          ms_apply_tokens "n";      want ""          "n clears everything"
+          ms_apply_tokens "core";   want "git curl"  "a set toggles its members"
+          ms_apply_tokens "3";      want "git"       "a number toggles one row"
+          if [ "$(ms_set_state 0)" != "1" ]; then echo "set should read as partial"; exit 1; fi
+          ms_apply_tokens "core";   want "git curl"  "a partial set fills up"
+          ms_apply_tokens "2-4";    want "tree"      "a range toggles each row"
+          ms_apply_tokens "v";      want "git curl"  "v inverts"
+
+          # A bad token is reported and rejected; the good ones still apply.
+          ms_apply_tokens "n"
+          rc=0; ms_apply_tokens "2 bogus 99 3-1 4" 2>/tmp/errs || rc=$?
+          if [ "$rc" -ne 1 ]; then echo "a rejected token should return 1, got $rc"; exit 1; fi
+          want "git tree" "good tokens apply despite a bad one"
+          for msg in "Not a valid choice: bogus" "Out of range: 99" "Bad range: 3-1"; do
+              if ! grep -qF "$msg" /tmp/errs; then echo "never reported: $msg"; exit 1; fi
+          done
+
+          rc=0; ms_apply_tokens "q" || rc=$?
+          if [ "$rc" -ne 2 ]; then echo "q should return 2, got $rc"; exit 1; fi
+          echo "menu parser OK"
+          '
+
+      - name: gum menu arguments
+        # gum itself needs a terminal, so CI checks the arguments we hand it.
+        run: |
+          bash -c '
+          . lib/common.sh
+          ms_load "fish|Sets|the fish set|fish-config fish-aliases" \
+                  "fish-config|Configs|config.fish|" \
+                  "fish-aliases|Configs|aliases.fish|" \
+                  "git|Configs|gitconfig|"
+          gum_args
+
+          # Set rows must not appear: gum cannot preselect by value, so a set
+          # row would start checked and unchecking it would look like a no-op.
+          if [ "${#GUM_ARGS[@]}" -ne 3 ]; then
+              echo "expected 3 leaf rows, got ${#GUM_ARGS[@]}"; exit 1
+          fi
+          printf "%s\n" "${GUM_ARGS[@]}" | grep -q "^Sets" && { echo "a set leaked into the gum list"; exit 1; }
+
+          # Each argument is "<display>TAB<key>", so --label-delimiter gives
+          # gum the display text and hands us back the bare key.
+          for want in fish-config fish-aliases git; do
+              printf "%s\n" "${GUM_ARGS[@]}" | grep -qP "\t$want\$" \
+                  || { echo "no row ending in tab-$want"; exit 1; }
+          done
+
+          gum_header "Pick:" | grep -q "sets: fish" || { echo "header omits the sets"; exit 1; }
+          echo "gum args OK"
+          '
+
+      - name: install.sh selection, without installing anything
+        run: |
+          ./install.sh --list | grep -q build-essential
+
+          # The [dry-run] prefix is the proof nothing ran - checking whether a
+          # package is present would only test what the runner image ships.
+          ./install.sh --dry-run --all </dev/null \
+              | grep -q "\[dry-run\] sudo apt-get install -y .*build-essential"
+
+          picked="$(./install.sh --dry-run --only core </dev/null | grep '^Installing:')"
+          echo "$picked"
+          grep -q git <<<"$picked"
+          if grep -q btop <<<"$picked"; then echo "--only core pulled in tools"; exit 1; fi
+
+          ! ./install.sh --all --only core </dev/null
+          ! ./install.sh --only bogus </dev/null
+
   smoke:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +142,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y fish fastfetch
+          sudo apt-get install -y fish fastfetch nano
 
       - name: setup.sh --dry-run changes nothing
         run: |
@@ -67,12 +154,17 @@ jobs:
       - name: setup.sh deploys every config
         # v1.68 shipped a setup.sh that deployed nothing at all, because the
         # source directory had been renamed. Only running it catches that.
+        #
+        # Deliberately passes no selection flag: with no tty setup.sh must
+        # still deploy everything, and this step is the regression test for
+        # that. Adding --all here would hide the very failure it guards.
         run: |
           export HOME="$RUNNER_TEMP/real" XDG_CONFIG_HOME="$RUNNER_TEMP/real/.config"
           mkdir -p "$HOME"
           ./setup.sh
           for f in fish/config.fish fish/conf.d/aliases.fish \
-                   fish/functions/swapreset.fish fastfetch/config.jsonc; do
+                   fish/functions/swapreset.fish fastfetch/config.jsonc \
+                   nano/nanorc; do
               [ -f "$XDG_CONFIG_HOME/$f" ] || { echo "missing $f"; exit 1; }
           done
           git config --global --get init.defaultBranch | grep -qx main
@@ -83,6 +175,66 @@ jobs:
           ./setup.sh
           [ "$(find "$XDG_CONFIG_HOME" -name '*.bak.*' | wc -l)" -eq 0 ] \
               || { echo "re-run created needless backups"; exit 1; }
+
+      - name: A piped stdin never opens the menu
+        run: |
+          export HOME="$RUNNER_TEMP/piped" XDG_CONFIG_HOME="$RUNNER_TEMP/piped/.config"
+          mkdir -p "$HOME"
+          # A gum that screams if it is ever run. Without a terminal the menu
+          # must be skipped entirely, so this must stay silent.
+          mkdir -p "$RUNNER_TEMP/fakebin"
+          printf '#!/bin/sh\necho "gum ran without a tty" >&2\nexit 99\n' \
+              > "$RUNNER_TEMP/fakebin/gum"
+          chmod +x "$RUNNER_TEMP/fakebin/gum"
+          export PATH="$RUNNER_TEMP/fakebin:$PATH"
+
+          out="$(printf 'n\n' | ./setup.sh --dry-run 2>&1)"
+          if grep -q "gum ran without a tty" <<<"$out"; then
+              echo "gum was invoked with no terminal"; exit 1
+          fi
+          grep -q "Non-interactive: selecting everything" <<<"$out"
+          if grep -q "Select configs to deploy" <<<"$out"; then
+              echo "menu drawn without a tty"; exit 1
+          fi
+          for s in "fish config" "fish aliases" "fish functions" "fastfetch config"; do
+              grep -q "Installing $s" <<<"$out" || { echo "skipped $s"; exit 1; }
+          done
+
+      - name: setup.sh --only deploys just that config
+        run: |
+          export HOME="$RUNNER_TEMP/only" XDG_CONFIG_HOME="$RUNNER_TEMP/only/.config"
+          mkdir -p "$HOME"
+          ./setup.sh --list | grep -q fish-aliases
+          ./setup.sh --only fastfetch
+          [ -f "$XDG_CONFIG_HOME/fastfetch/config.jsonc" ] || { echo "fastfetch missing"; exit 1; }
+          if [ -d "$XDG_CONFIG_HOME/fish" ]; then echo "--only fastfetch touched fish"; exit 1; fi
+          ./setup.sh --only fish-aliases
+          [ -f "$XDG_CONFIG_HOME/fish/conf.d/aliases.fish" ] || { echo "aliases missing"; exit 1; }
+          if [ -f "$XDG_CONFIG_HOME/fish/config.fish" ]; then echo "leaked config.fish"; exit 1; fi
+          ! ./setup.sh --only bogus
+          ! ./setup.sh --all --only fish
+
+      - name: nano syntax files are picked up without code changes
+        run: |
+          export HOME="$RUNNER_TEMP/nano" XDG_CONFIG_HOME="$RUNNER_TEMP/nano/.config"
+          mkdir -p "$HOME"
+
+          # An empty syntax dir must still produce a valid nanorc.
+          ./setup.sh --only nano
+          grep -q "generated includes below" "$XDG_CONFIG_HOME/nano/nanorc"
+
+          # Dropping a file in config/nano/syntax/ is the whole workflow, so it
+          # must need no edit anywhere else.
+          printf 'syntax "demo" "\\.demo$"\ncolor green "\\<end\\>"\n' \
+              > config/nano/syntax/demo.nanorc
+          ./setup.sh --only nano
+          [ -f "$XDG_CONFIG_HOME/nano/syntax/demo.nanorc" ] || { echo "syntax file not deployed"; exit 1; }
+          grep -q 'include ".*/nano/syntax/demo.nanorc"' "$XDG_CONFIG_HOME/nano/nanorc" \
+              || { echo "no include line generated"; exit 1; }
+
+          # And nano must actually accept the result.
+          nano --rcfile="$XDG_CONFIG_HOME/nano/nanorc" --version >/dev/null
+          rm -f config/nano/syntax/demo.nanorc
 
       - name: restore.sh puts a replaced file back
         run: |

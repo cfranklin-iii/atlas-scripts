@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh" || {
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$REPO_DIR/lib/common.sh" || {
     echo "atlas-scripts: cannot load lib/common.sh" >&2; exit 1
 }
 
@@ -60,15 +61,17 @@ install_driver() {
 
     info "Installing build essentials (build tools + dkms)..."
     detect_pkg_manager || exit 1
-    case "$PKG_MANAGER" in
-        apt)    sudo apt-get update && sudo apt-get install -y build-essential dkms ;;
-        pacman) sudo pacman -Syu --noconfirm base-devel dkms ;;
-        dnf)    sudo dnf install -y @development-tools dkms kernel-devel ;;
-        zypper) sudo zypper --non-interactive install gcc make dkms kernel-default-devel ;;
-    esac
+    local -a build_pkgs=()
+    # resolve_pkg prints nothing where a distro needs no such package, so let
+    # word splitting drop the empties rather than passing "" to the installer.
+    read -ra build_pkgs <<< "$(resolve_pkg buildtools) dkms $(resolve_pkg kernelheaders)"
+    pm_refresh
+    pm_install "${build_pkgs[@]}"
 
     info "Verifying build tools..."
-    make --version && gcc --version
+    if ! command -v make >/dev/null || ! command -v gcc >/dev/null; then
+        die "make and gcc are still missing; cannot build the kernel module."
+    fi
 
     # --dkms registers the module so it is rebuilt on kernel updates. Without
     # it the driver stops loading the next time the kernel is bumped.
@@ -108,6 +111,10 @@ install_toolkit() {
     sudo systemctl restart docker
     ok "Container Toolkit installed and wired into Docker."
 }
+
+# Every path below asks a question, and an unguarded `read` under `set -e`
+# dies with a confusing error when there is nothing to read from.
+have_tty || die "nvidia.sh is interactive; run it from a terminal."
 
 if command -v nvidia-smi &>/dev/null; then
     ok "NVIDIA drivers are already installed."

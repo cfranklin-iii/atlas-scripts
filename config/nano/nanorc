@@ -1,0 +1,32 @@
+# === Settings ===
+set indicator
+# set linenumbers
+set historylog
+set mouse
+set positionlog
+set locking
+set nohelp
+set quickblank
+# set softwrap
+set tabsize 4
+set tabstospaces
+
+# === Syntax ===
+include ~/.config/nano/syntax/*.nanorc
+
+# === Binds ===
+bind ^Z undo main
+bind ^Y redo main
+
+# === Colors ===
+set titlecolor bold,white,black
+set promptcolor bold,white
+set statuscolor italic,white
+set errorcolor bold,red
+set spotlightcolor yellow,black
+set selectedcolor lightwhite,#804
+set stripecolor ,#444
+set scrollercolor gray,#222
+set numbercolor bold,gray
+set keycolor bold,yellow
+set functioncolor gray
