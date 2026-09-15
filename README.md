@@ -12,6 +12,17 @@ cd atlas-scripts
 ./setup.sh     # 2. deploy configs into ~/.config
 ```
 
+`setup.sh` takes a few options:
+
+| Option | Effect |
+| --- | --- |
+| `-l`, `--link` | Symlink the configs instead of copying, so repo edits apply immediately |
+| `-n`, `--dry-run` | Report what would change without touching anything |
+| `-y`, `--yes` | Assume yes for prompts (e.g. setting fish as the login shell) |
+| `-h`, `--help` | Show usage |
+
+Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
+
 Run `install.sh` first — `setup.sh` only deploys configs for tools it finds on
 `PATH`, so anything not yet installed is skipped with a warning.
 
@@ -45,6 +56,14 @@ Run `install.sh` first — `setup.sh` only deploys configs for tools it finds on
  - Interactive script for installing NVIDIA drivers (v595.99.02) and Container Toolkit
  - Robust error handling: uses `trap` for automatic cleanup of `.run` files
  - Smart guards: detects system type to provide tailored instructions for Container Toolkit (apt-native, Arch/AUR instructions)
+ - Verifies the download against NVIDIA's published SHA-256 before running it as root
+ - Pre-flight checks for a running graphical session, Secure Boot and loaded nouveau
+ - Installs via `--dkms` so the module survives kernel updates
+
+`restore.sh`
+ - Restores each config from the most recent backup `setup.sh` took
+ - Same `--dry-run` / `--yes` flags, plus `--list` to see what is available
+ - Leaves backups in place, so restoring is repeatable
 
 ### Key Features
 - **Modern Fastfetch:** Custom UI-like boxed configuration, split into System and
@@ -54,10 +73,15 @@ Run `install.sh` first — `setup.sh` only deploys configs for tools it finds on
 - **Local Overrides:** Drop personal settings in `~/.config/fish/config.local.fish` and
   aliases in `~/.config/fish/aliases.local.fish`. These are auto-sourced by the managed
   files and are never overwritten by `setup.sh`.
-- **Safe Backups:** Existing configs are backed up with a timestamp before being replaced.
+- **Safe Backups:** Existing configs are backed up with a timestamp before being replaced,
+  and `restore.sh` brings them back. Unchanged files are skipped, so re-running does not
+  pile up identical backups.
 - **XDG-Aware:** Respects `$XDG_CONFIG_HOME` when locating config directories.
-- **Safety First:** All scripts use `set -e`, avoid dangerous `eval` calls, and the NVIDIA
-  installer downloads into a temp dir cleaned up via `trap`.
+- **Safety First:** All scripts use `set -euo pipefail`, avoid dangerous `eval` calls,
+  verify that `lib/common.sh` actually loaded, and the NVIDIA installer downloads into a
+  temp dir cleaned up via `trap`.
+- **Tested in CI:** Every push runs shellcheck, a bash/fish syntax pass, and a smoke test
+  that deploys the configs into a scratch `$HOME` and restores them again.
 
 ### 🔧 Local Overrides — keeping your own configs/aliases
 Anything you want to keep that shouldn't live in the repo goes in a `*.local.fish` file:

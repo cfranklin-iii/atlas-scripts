@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck fish fastfetch
+
+      - name: Shellcheck
+        run: shellcheck --severity=style install.sh setup.sh nvidia.sh restore.sh lib/common.sh
+
+      - name: Bash syntax
+        run: |
+          for f in install.sh setup.sh nvidia.sh restore.sh lib/common.sh; do
+              bash -n "$f"
+          done
+
+      - name: Fish syntax
+        run: |
+          for f in config/fish/config.fish config/fish/aliases.fish config/fish/functions/*.fish; do
+              fish --no-execute "$f"
+          done
+
+      - name: Fastfetch config is valid
+        run: |
+          python3 -c "import json; json.load(open('config/fastfetch/config.jsonc'))"
+          fastfetch --config "$PWD/config/fastfetch/config.jsonc" --pipe >/dev/null
+
+      - name: Versions agree
+        run: |
+          # The README title and the nvidia.sh driver version have both drifted
+          # from reality before; fail the build rather than ship a stale README.
+          version="$(cat VERSION)"
+          grep -qF "(v$version)" README.md \
+              || { echo "README title does not match VERSION ($version)"; exit 1; }
+          driver="$(sed -n 's/^VERSION="\(.*\)"/\1/p' nvidia.sh)"
+          grep -qF "v$driver" README.md \
+              || { echo "README does not mention nvidia.sh driver $driver"; exit 1; }
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fish fastfetch
+
+      - name: setup.sh --dry-run changes nothing
+        run: |
+          export HOME="$RUNNER_TEMP/dry" XDG_CONFIG_HOME="$RUNNER_TEMP/dry/.config"
+          mkdir -p "$HOME"
+          ./setup.sh --dry-run
+          [ "$(find "$HOME" -type f | wc -l)" -eq 0 ] || { echo "dry run wrote files"; exit 1; }
+
+      - name: setup.sh deploys every config
+        # v1.68 shipped a setup.sh that deployed nothing at all, because the
+        # source directory had been renamed. Only running it catches that.
+        run: |
+          export HOME="$RUNNER_TEMP/real" XDG_CONFIG_HOME="$RUNNER_TEMP/real/.config"
+          mkdir -p "$HOME"
+          ./setup.sh
+          for f in fish/config.fish fish/conf.d/aliases.fish \
+                   fish/functions/swapreset.fish fastfetch/config.jsonc; do
+              [ -f "$XDG_CONFIG_HOME/$f" ] || { echo "missing $f"; exit 1; }
+          done
+          git config --global --get init.defaultBranch | grep -qx main
+
+      - name: Re-running is idempotent
+        run: |
+          export HOME="$RUNNER_TEMP/real" XDG_CONFIG_HOME="$RUNNER_TEMP/real/.config"
+          ./setup.sh
+          [ "$(find "$XDG_CONFIG_HOME" -name '*.bak.*' | wc -l)" -eq 0 ] \
+              || { echo "re-run created needless backups"; exit 1; }
+
+      - name: restore.sh puts a replaced file back
+        run: |
+          export HOME="$RUNNER_TEMP/real" XDG_CONFIG_HOME="$RUNNER_TEMP/real/.config"
+          echo "# local tweak" >> "$XDG_CONFIG_HOME/fish/config.fish"
+          ./setup.sh
+          ./restore.sh --yes
+          tail -1 "$XDG_CONFIG_HOME/fish/config.fish" | grep -qx "# local tweak"
