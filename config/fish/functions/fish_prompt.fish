@@ -30,12 +30,12 @@ function fish_prompt
                 set -l field_name $argv[2]
                 set -l field_value $argv[3]
         
-                set_color --reset
+                set_color normal
                 set_color $retc
                 echo -n ' | '
                 set_color -o yellow
                 echo -n '('
-                set_color --reset
+                set_color normal
                 test -n $field_name
                 and echo -n $field_name:
                 set_color -o yellow
@@ -93,7 +93,7 @@ function fish_prompt
                         case visual
                                 set mode (set_color --bold magenta)V
                 end
-                set mode $mode(set_color --reset)
+                set mode $mode(set_color normal)
                 _nim_prompt_wrapper $retc '' $mode
         end
     
@@ -117,7 +117,7 @@ function fish_prompt
         echo
     
         # Background jobs
-        set_color --reset
+        set_color normal
     
         for job in (jobs)
                 set_color $retc
@@ -126,10 +126,10 @@ function fish_prompt
                 echo $job
         end
     
-        set_color --reset
+        set_color normal
         set_color $retc
         echo -n '╰─>'
         set_color -o yellow
         echo -n '$ '
-        set_color --reset
+        set_color normal
 end
