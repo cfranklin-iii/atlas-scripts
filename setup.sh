@@ -191,10 +191,18 @@ deploy_nano_config() {
     info "\nInstalling nano config..."
     run mkdir -p "$CFG/nano"
 
+    local staged
+    staged="$(mktemp)"
+    
+    if [ -f "$CONFIG_DIR/nano/nanorc" ]; then
+        cat "$CONFIG_DIR/nano/nanorc" > "$staged"
+    fi
+
     for f in "$CONFIG_DIR"/nano/syntax/*.nanorc; do
         [ -e "$f" ] || continue
         printf 'include "%s/nano/syntax/%s"\n' "$CFG" "$(basename "$f")" >> "$staged"
     done
+
     install_file "$staged" "$CFG/nano/nanorc" nolink
     rm -f "$staged"
 

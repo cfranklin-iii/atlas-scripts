@@ -106,11 +106,18 @@ jobs:
           fi
           printf "%s\n" "${GUM_ARGS[@]}" | grep -q "^Sets" && { echo "a set leaked into the gum list"; exit 1; }
 
-          # Each argument is "<display>TAB<key>", so --label-delimiter gives
-          # gum the display text and hands us back the bare key.
+          # gum hands the option strings straight back, so every rendered row
+          # must map to a key - that lookup is what replaced --label-delimiter,
+          # a flag gum only grew in v0.15.
+          for row in "${GUM_ARGS[@]}"; do
+              case "$row" in
+                  *"	"*) echo "row still carries a tab: $row"; exit 1 ;;
+              esac
+              [ -n "${GUM_KEY_OF[$row]:-}" ] || { echo "no key for row: $row"; exit 1; }
+          done
           for want in fish-config fish-aliases git; do
-              printf "%s\n" "${GUM_ARGS[@]}" | grep -qP "\t$want\$" \
-                  || { echo "no row ending in tab-$want"; exit 1; }
+              printf "%s\n" "${GUM_KEY_OF[@]}" | grep -qx "$want" \
+                  || { echo "no row mapping to $want"; exit 1; }
           done
 
           gum_header "Pick:" | grep -q "sets: fish" || { echo "header omits the sets"; exit 1; }

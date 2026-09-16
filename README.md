@@ -1,4 +1,4 @@
-# Atlas Scripts (v1.70)
+# Atlas Scripts (v1.71)
 
 Bootstrap scripts and fish/fastfetch configs for setting up a fresh Linux box.
 
@@ -44,9 +44,9 @@ distro's package manager, then — since gum is missing from Debian 12, Ubuntu
 `~/.local/bin`. Charm's apt/yum repo is deliberately *not* added; a menu isn't
 worth leaving a third-party package source and signing key on your machine.
 
-**If that fails**, or you decline, or you're running `--dry-run` (which never
-installs anything), the scripts fall back to a built-in menu that needs nothing
-but bash:
+**If that fails**, or you decline, or the installed gum turns out to be too old
+for the menu, or you're running `--dry-run` (which never installs anything), the
+scripts fall back to a built-in menu that needs nothing but bash:
 
 ```
 Select configs to deploy:
@@ -110,6 +110,13 @@ clean run the log is deleted. Because the output is hidden, the sudo password
 is asked for up front — a hidden password prompt is indistinguishable from a
 hang. With no terminal the bar degrades to one plain line per package, so CI
 logs stay readable, and `--dry-run` keeps the fully narrated output.
+
+Fetching gum draws the same bar over its three steps, so the one download these
+scripts do on their own looks like every other install:
+
+```
+ (2/3) unpacking gum 0.17.0            [--------------C• • • • •]  66%
+```
 
 Installing per package costs a dependency resolution each time, which is
 slightly slower than one batched call, but it is what makes the count real and

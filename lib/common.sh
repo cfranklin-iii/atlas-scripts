@@ -120,21 +120,23 @@ term_cols() {
     printf '%s\n' "$c"
 }
 
+# Draw step $1 of $2, named $3. $4 renames the verb - the default reads right
+# for install.sh, which was the only caller when this bar was written.
 progress_bar() {
-    local done="$1" total="$2" label="$3"
+    local done="$1" total="$2" label="$3" verb="${4:-installing}"
     local pct cols barw labelw fill i bar=""
 
     [ "$total" -gt 0 ] || return 0
     pct=$(( done * 100 / total ))
 
     if [ ! -t 1 ]; then
-        printf ' (%d/%d) installing %s\n' "$done" "$total" "$label"
+        printf ' (%d/%d) %s %s\n' "$done" "$total" "$verb" "$label"
         return 0
     fi
 
     cols="$(term_cols)"
     barw=24
-    labelw=$(( cols - barw - 32 ))
+    labelw=$(( cols - barw - ${#verb} - 22 ))
     [ "$labelw" -lt 10 ] && labelw=10
     [ "$labelw" -gt 28 ] && labelw=28
 
@@ -147,8 +149,8 @@ progress_bar() {
         fi
     done
 
-    printf '\r\033[K (%d/%d) installing %-*.*s [%b%b%b] %3d%%' \
-        "$done" "$total" "$labelw" "$labelw" "$label" \
+    printf '\r\033[K (%d/%d) %s %-*.*s [%b%b%b] %3d%%' \
+        "$done" "$total" "$verb" "$labelw" "$labelw" "$label" \
         "$YELLOW" "$bar" "$NC" "$pct"
     PROGRESS_ACTIVE=1
 }
@@ -390,11 +392,21 @@ export GUM_CHOOSE_CURSOR_FOREGROUND="${GUM_CHOOSE_CURSOR_FOREGROUND:-#FF5FAF}"
 export GUM_CHOOSE_SELECTED_FOREGROUND="${GUM_CHOOSE_SELECTED_FOREGROUND:-#5FFFAF}"
 export GUM_CHOOSE_ITEM_FOREGROUND="${GUM_CHOOSE_ITEM_FOREGROUND:-}"
 
+# One step of the gum install, drawn on the shared progress bar. The command's
+# own output goes to the log, where it cannot scribble over the bar's line.
+GUM_LOG=""
+GUM_STEPS=3
+gum_step() {
+    local n="$1" verb="$2"; shift 2
+    progress_bar "$n" "$GUM_STEPS" "gum $GUM_VERSION" "$verb"
+    "$@" >>"$GUM_LOG" 2>&1
+}
+
 # Fetch the upstream static binary into ~/.local/bin. Deliberately not Charm's
 # apt/yum repo: a menu is not worth leaving a third-party package source and
 # signing key on someone's machine, and this needs no root.
 gum_download() {
-    local arch url tmp found rc=0
+    local arch url tmp found fail=""
     case "$(uname -m)" in
         x86_64)          arch=x86_64 ;;
         aarch64 | arm64) arch=arm64 ;;
@@ -404,25 +416,35 @@ gum_download() {
 
     command -v curl &>/dev/null || { err "curl is needed to fetch gum."; return 1; }
     tmp="$(mktemp -d)"
-    info "Downloading gum $GUM_VERSION..."
-    if ! curl -fsSL "$url" -o "$tmp/gum.tgz"; then
-        err "Could not download gum from $url"
-        rc=1
-    elif ! tar -xzf "$tmp/gum.tgz" -C "$tmp"; then
-        err "Could not unpack the gum archive."
-        rc=1
+    GUM_LOG="$tmp/gum.log"
+
+    # Named steps rather than a byte count: curl's own meter wants the line to
+    # itself, and unpacking and installing are worth showing as well. Failures
+    # are saved and reported after progress_end, so the message lands on a line
+    # of its own instead of on the tail of the bar.
+    if ! gum_step 1 downloading curl -fsSL "$url" -o "$tmp/gum.tgz"; then
+        fail="Could not download gum from $url"
+    elif ! gum_step 2 unpacking tar -xzf "$tmp/gum.tgz" -C "$tmp"; then
+        fail="Could not unpack the gum archive."
     else
         found="$(find "$tmp" -type f -name gum | head -1)"
         if [ -z "$found" ]; then
-            err "No gum binary inside the archive."
-            rc=1
+            fail="No gum binary inside the archive."
         else
             mkdir -p "$HOME/.local/bin"
-            install -m 755 "$found" "$HOME/.local/bin/gum" || rc=1
+            gum_step 3 installing install -m 755 "$found" "$HOME/.local/bin/gum" \
+                || fail="Could not install gum into $HOME/.local/bin."
         fi
     fi
+    progress_end
+
+    if [ -n "$fail" ]; then
+        err "$fail"
+        if [ -s "$GUM_LOG" ]; then tail -3 "$GUM_LOG" | sed 's/^/    /' >&2; fi
+    fi
     rm -rf "$tmp"
-    [ "$rc" -eq 0 ] || return 1
+    GUM_LOG=""
+    [ -z "$fail" ] || return 1
 
     GUM_BIN="$HOME/.local/bin/gum"
     ok "Installed gum to $GUM_BIN"
@@ -471,9 +493,11 @@ ensure_gum() {
     return 0
 }
 
-# Render the leaf rows as `gum choose` arguments. Each is "<display>\t<key>",
-# which --label-delimiter splits so gum shows the display text but prints back
-# the bare key. Split out from gum_menu so CI can check it without a terminal.
+# Render the leaf rows as `gum choose` arguments, remembering which key each
+# rendered row stands for. gum prints the option strings back verbatim, so
+# mapping display -> key here keeps us off --label-delimiter, which gum only
+# grew in v0.15 and which older distro builds reject with a usage error.
+# Split out from gum_menu so CI can check it without a terminal.
 #
 # Set rows are deliberately left out. gum's list is flat, and its --selected
 # cannot preselect by value, so a set row would have to start checked like
@@ -481,15 +505,19 @@ ensure_gum() {
 # its members stay checked on their own. Sets remain available through --only,
 # --exclude and --list, and the built-in menu still shows them as real rows.
 gum_args() {
-    local i
+    local i row
     GUM_ARGS=()
+    GUM_KEY_OF=()
     for i in "${!MS_KEY[@]}"; do
         [ -z "${MS_MEMBERS[$i]}" ] || continue
-        GUM_ARGS+=("$(printf '%-10s %-16s %s\t%s' \
-            "${MS_SECTION[$i]}" "${MS_KEY[$i]}" "${MS_LABEL[$i]}" "${MS_KEY[$i]}")")
+        row="$(printf '%-10s %-16s %s' \
+            "${MS_SECTION[$i]}" "${MS_KEY[$i]}" "${MS_LABEL[$i]}")"
+        GUM_ARGS+=("$row")
+        GUM_KEY_OF["$row"]="${MS_KEY[$i]}"
     done
 }
 GUM_ARGS=()
+declare -A GUM_KEY_OF=()
 
 # Name the sets in the header, so they stay discoverable from the menu even
 # though they are not rows in it.
@@ -506,10 +534,12 @@ gum_header() {
     fi
 }
 
-# The gum front end. Fills SEL_EXPANDED; returns 1 if the user aborted.
+# The gum front end. Fills SEL_EXPANDED. Returns 1 if the user aborted, and 2
+# if gum itself failed - the caller falls back to the built-in menu on 2, but
+# must not second-guess a deliberate abort.
 gum_menu() {
-    local height rc=0
-    local -a chosen=()
+    local height rc=0 out line
+    local -a chosen=() keys=()
     gum_args
 
     # Show every row at once where the terminal allows it, rather than making
@@ -517,14 +547,29 @@ gum_menu() {
     height=$(( ${#GUM_ARGS[@]} + 1 ))
     [ "$height" -gt 20 ] && height=20
 
-    mapfile -t chosen < <("$GUM_BIN" choose \
+    # Via a file, not a process substitution: `mapfile < <(gum)` reports
+    # mapfile's status, not gum's, so a gum that bailed out looked like a
+    # successful pick and its usage text arrived as the selection.
+    out="$(mktemp)"
+    "$GUM_BIN" choose \
         --no-limit --selected='*' --height="$height" \
-        --header="$(gum_header "$1")" --label-delimiter=$'\t' \
-        "${GUM_ARGS[@]}") || rc=$?
-    # gum exits 130 on ctrl-c and 1 when it cannot open a terminal.
-    [ "$rc" -eq 0 ] || return 1
+        --header="$(gum_header "$1")" \
+        "${GUM_ARGS[@]}" >"$out" || rc=$?
+    mapfile -t chosen <"$out"
+    rm -f "$out"
 
-    expand_keys ${chosen[@]+"${chosen[@]}"}
+    # gum exits 130 on ctrl-c; anything else non-zero is gum failing on us.
+    if [ "$rc" -eq 130 ]; then return 1; fi
+    if [ "$rc" -ne 0 ]; then
+        err "gum exited with status $rc; using the built-in menu."
+        return 2
+    fi
+
+    for line in ${chosen[@]+"${chosen[@]}"}; do
+        [ -n "$line" ] || continue
+        keys+=("${GUM_KEY_OF["$line"]:-$line}")
+    done
+    expand_keys ${keys[@]+"${keys[@]}"}
 }
 
 # -- Selection ----------------------------------------------------------------
@@ -608,9 +653,18 @@ choose() {
     elif [ "$SEL_ALL" -eq 1 ]; then
         sel_leaves
     elif have_tty; then
+        local gum_rc=0
         if ensure_gum; then
-            gum_menu "$2" || return 1
+            gum_menu "$2" || gum_rc=$?
+            # 1 is a deliberate abort, and second-guessing it with another
+            # menu would be worse than useless.
+            if [ "$gum_rc" -eq 1 ]; then return 1; fi
         else
+            gum_rc=2
+        fi
+        # 2 = no usable gum, so draw the menu ourselves rather than letting a
+        # broken gum be the end of the run.
+        if [ "$gum_rc" -ne 0 ]; then
             multiselect "$2" || return 1
         fi
     else
