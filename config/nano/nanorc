@@ -1,15 +1,16 @@
 # === Settings ===
 set indicator
-# set linenumbers
 set historylog
 set mouse
 set positionlog
 set locking
 set nohelp
 set quickblank
-# set softwrap
 set tabsize 4
 set tabstospaces
+## === Optional/Disabled Settings === 
+# set softwrap
+# set linenumbers
 
 # === Syntax ===
 include ~/.config/nano/syntax/*.nanorc
@@ -23,7 +24,7 @@ set titlecolor bold,white,black
 set promptcolor bold,white
 set statuscolor italic,white
 set errorcolor bold,red
-set spotlightcolor yellow,black
+set spotlightcolor white,grey
 set selectedcolor lightwhite,#804
 set stripecolor ,#444
 set scrollercolor gray,#222
