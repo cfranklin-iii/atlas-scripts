@@ -9,13 +9,17 @@ comment "--"
 
 linter luacheck --no-color
 
+# Strings
+color sky ""([^"\]|\\.)*"|'([^'\]|\\.)*'"
+color sky start="\[\[" end="\]\]"
+
 # Operators
 color brightyellow "#|%|&|\*|\+|-|/|:|<|<=|==|>=|>|\^|\||~|~=|\.\.|\<(and|or|not)\>"
 # Don't partially color ... as an operator
 color normal "\.\.\."
 
 # Statements
-color bold,sea "\<(do|end|for|in|if|then|elseif|else|repeat|until|while|break|goto|return|function|global|local)\>"
+color sea "\<(do|end|for|in|if|then|elseif|else|repeat|until|while|break|goto|return|function|global|local)\>"
 
 # Basic functions
 color brightyellow "\<(assert|collectgarbage|dofile|error|(get|set)metatable|load(file)?|next|i?pairs|x?pcall|print|raw(equal|get|len|set)|require|select|tonumber|tostring|type|warn)[[:blank:]]*\("
@@ -46,7 +50,7 @@ color lagoon "\<[0-9]+(\.[0-9]*)?([Ee][+-]?[0-9]+)?\>"
 color lagoon "\<0[Xx][[:xdigit:]]+(\.[[:xdigit:]]*)?([Pp][+-]?[0-9]+)?\>"
 
 # Brackets
-color peach "\(|\)|\[|\]|\{|\}"
+color green "\(|\)|\[|\]|\{|\}"
 
 # Shebang
 color brightcyan "^#!.*"
@@ -54,13 +58,13 @@ color brightcyan "^#!.*"
 # Labels
 color blue "::[[:alnum:]_]+::"
 
-# Strings
-color sand ""([^"\]|\\.)*"|'([^'\]|\\.)*'"
-color sand start="\[\[" end="\]\]"
-
 # Backslash escapes
 color sea "\\([abfnrtvz\"']|[0-9]{1,3}|x[[:xdigit:]]{2}|u\{[[:xdigit:]]{1,6}\})"
 
 # Simple comments and multiline comments
-color cyan "--.*"
-color cyan start="--\[\[" end="\]\]"
+color bold,plum "--.*"
+color bold,brick start="--\[\[" end="\]\]"
+
+# Hyprland .lua Files
+color bold,lagoon "hl.*\(\{"
+
