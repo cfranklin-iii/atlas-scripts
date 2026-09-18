@@ -1,4 +1,4 @@
-# Atlas Scripts (v1.73)
+# Atlas Scripts (v1.74)
 
 Bootstrap scripts and fish/fastfetch configs for setting up a fresh Linux box.
 
@@ -111,8 +111,8 @@ is asked for up front — a hidden password prompt is indistinguishable from a
 hang. With no terminal the bar degrades to one plain line per package, so CI
 logs stay readable, and `--dry-run` keeps the fully narrated output.
 
-Fetching gum draws the same bar over its three steps, so the one download these
-scripts do on their own looks like every other install:
+Fetching gum draws the same bar over its three steps, so the downloads these
+scripts do on their own look like every other install:
 
 ```
  (2/3) unpacking gum 0.17.0            [--------------C• • • • •]  66%
@@ -121,6 +121,35 @@ scripts do on their own looks like every other install:
 Installing per package costs a dependency resolution each time, which is
 slightly slower than one batched call, but it is what makes the count real and
 lets a failure name exactly one package.
+
+### When your distro has no package
+
+**fastfetch** is missing from distros people actually run: Debian 12 and 13
+have no package at all, and Ubuntu only got one in 24.10. Rather than fail the
+run over it, `install.sh` asks the package manager first, and fetches the
+project's own static build into `~/.local/bin` when the answer is no:
+
+```
+apt has no fastfetch package; fetching the upstream build.
+ (2/3) unpacking fastfetch 2.68.1      [--------------C• • • • •]  66%
+Installed fastfetch to /home/you/.local/bin/fastfetch
+```
+
+Same reasoning as gum, and the same code: no third-party package source or
+signing key on your machine, no root needed, and one `rm` to undo. The pinned
+version lives in `lib/common.sh` as `FASTFETCH_VERSION`, and the environment
+wins over it:
+
+```bash
+FASTFETCH_VERSION=2.60.0 ./install.sh --only fastfetch
+```
+
+If the download fails as well, that package — and only that package — is
+reported as failed; everything else is already installed, and the run says so.
+Every script puts `~/.local/bin` on its own `PATH`, so `setup.sh` deploys the
+fastfetch config straight afterwards even if your shell does not have that
+directory yet. It is worth adding to your `PATH` regardless, which the install
+tells you about when it is missing.
 
 To skip the menu entirely:
 

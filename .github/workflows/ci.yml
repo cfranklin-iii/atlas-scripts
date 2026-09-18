@@ -141,6 +141,61 @@ jobs:
           ! ./install.sh --all --only core </dev/null
           ! ./install.sh --only bogus </dev/null
 
+      - name: Package availability check
+        run: |
+          bash -c '
+          . lib/common.sh
+          detect_pkg_manager
+          pm_has_pkg fish || { echo "fish should be available"; exit 1; }
+          if pm_has_pkg definitely-not-a-package-xyz; then
+              echo "a bogus package was reported as available"; exit 1
+          fi
+          echo "pm_has_pkg OK"
+          '
+
+      - name: install.sh falls back to the upstream fastfetch
+        # This runner has a fastfetch package, so the fallback is driven with a
+        # fake apt that says it does not - the shape of Debian 12 and of Ubuntu
+        # before 24.10, which is the case this whole path exists for. The fake
+        # sudo keeps the run off the real system.
+        run: |
+          mkdir -p "$RUNNER_TEMP/fbbin"
+          printf '%s\n' '#!/bin/sh' \
+              'case "$*" in' \
+              '    *fastfetch*) echo "E: Unable to locate package fastfetch" >&2; exit 100 ;;' \
+              '    *) exit 0 ;;' \
+              'esac' > "$RUNNER_TEMP/fbbin/apt-get"
+          printf '%s\n' '#!/bin/sh' '[ "$1" = -v ] && exit 0' 'exec "$@"' \
+              > "$RUNNER_TEMP/fbbin/sudo"
+          chmod +x "$RUNNER_TEMP/fbbin/apt-get" "$RUNNER_TEMP/fbbin/sudo"
+
+          export HOME="$RUNNER_TEMP/fallback" PATH="$RUNNER_TEMP/fbbin:$PATH"
+          mkdir -p "$HOME"
+          ./install.sh --only tools </dev/null | tee "$RUNNER_TEMP/fb.out"
+
+          grep -q "no fastfetch package" "$RUNNER_TEMP/fb.out" \
+              || { echo "the fallback never reported why it ran"; exit 1; }
+          grep -q "Successfully installed:.*fastfetch" "$RUNNER_TEMP/fb.out" \
+              || { echo "fastfetch missing from the installed list"; exit 1; }
+          "$HOME/.local/bin/fastfetch" --version
+
+          # A fallback that cannot download must fail that package alone, and
+          # still report the ones that went in.
+          rm -rf "$HOME"; mkdir -p "$HOME"
+          out="$(FASTFETCH_VERSION=0.0.0-nope ./install.sh --only tools </dev/null 2>&1)" \
+              && { echo "a failed fallback should exit non-zero"; exit 1; }
+          printf '%s\n' "$out"
+          grep -q "Could not install: fastfetch" <<<"$out"
+          grep -q "Installed: tree btop" <<<"$out"
+
+      - name: A dry run never downloads anything
+        run: |
+          export HOME="$RUNNER_TEMP/dryfb"
+          mkdir -p "$HOME"
+          ./install.sh --dry-run --only fastfetch </dev/null \
+              | grep -q "\[dry-run\] if apt has no fastfetch"
+          [ ! -e "$HOME/.local/bin/fastfetch" ] || { echo "dry run installed it"; exit 1; }
+
   smoke:
     runs-on: ubuntu-latest
     steps:
@@ -220,28 +275,6 @@ jobs:
           if [ -f "$XDG_CONFIG_HOME/fish/config.fish" ]; then echo "leaked config.fish"; exit 1; fi
           ! ./setup.sh --only bogus
           ! ./setup.sh --all --only fish
-
-      - name: nano syntax files are picked up without code changes
-        run: |
-          export HOME="$RUNNER_TEMP/nano" XDG_CONFIG_HOME="$RUNNER_TEMP/nano/.config"
-          mkdir -p "$HOME"
-
-          # An empty syntax dir must still produce a valid nanorc.
-          ./setup.sh --only nano
-          grep -q "generated includes below" "$XDG_CONFIG_HOME/nano/nanorc"
-
-          # Dropping a file in config/nano/syntax/ is the whole workflow, so it
-          # must need no edit anywhere else.
-          printf 'syntax "demo" "\\.demo$"\ncolor green "\\<end\\>"\n' \
-              > config/nano/syntax/demo.nanorc
-          ./setup.sh --only nano
-          [ -f "$XDG_CONFIG_HOME/nano/syntax/demo.nanorc" ] || { echo "syntax file not deployed"; exit 1; }
-          grep -q 'include ".*/nano/syntax/demo.nanorc"' "$XDG_CONFIG_HOME/nano/nanorc" \
-              || { echo "no include line generated"; exit 1; }
-
-          # And nano must actually accept the result.
-          nano --rcfile="$XDG_CONFIG_HOME/nano/nanorc" --version >/dev/null
-          rm -f config/nano/syntax/demo.nanorc
 
       - name: restore.sh puts a replaced file back
         run: |

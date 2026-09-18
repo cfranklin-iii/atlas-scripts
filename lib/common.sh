@@ -23,6 +23,21 @@ declare -A SECTION_DIRS=(
     [nano]="$CFG/nano"
 )
 
+# A package the distro does not have is installed into ~/.local/bin instead
+# (see "Upstream fallbacks" below), and not every distro has that on PATH.
+# Adding it here, for this process only, means a binary installed by one of
+# these scripts is found by the same run that installed it - and by setup.sh
+# afterwards, which deploys a config only for a tool it can see. The original
+# is kept so local_bin_note() can tell whether the user's own shell would have
+# found the binary without our help.
+PATH_BEFORE="$PATH"
+if [ -d "$HOME/.local/bin" ]; then
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) PATH="$HOME/.local/bin:$PATH"; export PATH ;;
+    esac
+fi
+
 DRY_RUN="${DRY_RUN:-0}"
 
 run() {
@@ -104,6 +119,21 @@ pm_install() {
         pacman) run sudo pacman -S --needed --noconfirm "$@" ;;
         dnf)    run sudo dnf install -y "$@" ;;
         zypper) run sudo zypper --non-interactive install "$@" ;;
+    esac
+}
+
+# Can the package manager actually install $1? Asked only about packages that
+# have an upstream fallback, where knowing in advance turns an alarming install
+# failure into a deliberate choice of route. Every form below is a read-only
+# metadata query and needs no root.
+pm_has_pkg() {
+    case "$PKG_MANAGER" in
+        # A simulated install rather than apt-cache policy: it needs no
+        # parsing of output that some locales translate.
+        apt)    apt-get install -s -qq -- "$1" &>/dev/null ;;
+        pacman) pacman -Si -- "$1" &>/dev/null ;;
+        dnf)    dnf -q info -- "$1" &>/dev/null ;;
+        zypper) zypper --non-interactive search --match-exact -- "$1" &>/dev/null ;;
     esac
 }
 
@@ -372,6 +402,125 @@ multiselect() {
     sel_selected
 }
 
+# -- Static binary downloads --------------------------------------------------
+# Shared machinery for "this distro has no package, so fetch the project's own
+# static build". Deliberately not the projects' apt/yum repos: a menu or a
+# system-info printer is not worth leaving a third-party package source and
+# signing key on someone's machine, and a plain binary in ~/.local/bin needs no
+# root and is one `rm` to undo.
+FETCH_LOG=""
+FETCH_STEPS=3
+
+# One step of a fetch, drawn on the shared progress bar. The command's own
+# output goes to the log, where it cannot scribble over the bar's line.
+fetch_step() {
+    local n="$1" verb="$2" label="$3"; shift 3
+    progress_bar "$n" "$FETCH_STEPS" "$label" "$verb"
+    "$@" >>"$FETCH_LOG" 2>&1
+}
+
+# Fetch the .tar.gz at $2, find the executable named $1 inside it and install
+# that into ~/.local/bin. $3 labels the progress bar. Sets FETCHED_BIN to the
+# installed path on success.
+FETCHED_BIN=""
+fetch_static_bin() {
+    local name="$1" url="$2" label="$3"
+    local tmp found fail=""
+
+    FETCHED_BIN=""
+    command -v curl &>/dev/null || { err "curl is needed to fetch $name."; return 1; }
+    command -v tar  &>/dev/null || { err "tar is needed to unpack $name."; return 1; }
+    tmp="$(mktemp -d)"
+    FETCH_LOG="$tmp/fetch.log"
+
+    # Named steps rather than a byte count: curl's own meter wants the line to
+    # itself, and unpacking and installing are worth showing as well. Failures
+    # are saved and reported after progress_end, so the message lands on a line
+    # of its own instead of on the tail of the bar.
+    if ! fetch_step 1 downloading "$label" curl -fsSL "$url" -o "$tmp/dl.tgz"; then
+        fail="Could not download $name from $url"
+    elif ! fetch_step 2 unpacking "$label" tar -xzf "$tmp/dl.tgz" -C "$tmp"; then
+        fail="Could not unpack the $name archive."
+    else
+        # bin/ and the executable bit first, because these archives also ship
+        # a shell completion named after the tool. -print -quit rather than
+        # `| head -1`, which would hand find a closed pipe.
+        found="$(find "$tmp" -type f -perm -u+x -path "*bin/$name" -print -quit)"
+        if [ -z "$found" ]; then
+            found="$(find "$tmp" -type f -perm -u+x -name "$name" -print -quit)"
+        fi
+        if [ -z "$found" ]; then
+            fail="No $name binary inside the archive."
+        else
+            mkdir -p "$HOME/.local/bin"
+            fetch_step 3 installing "$label" \
+                install -m 755 "$found" "$HOME/.local/bin/$name" \
+                || fail="Could not install $name into $HOME/.local/bin."
+        fi
+    fi
+    progress_end
+
+    if [ -n "$fail" ]; then
+        err "$fail"
+        if [ -s "$FETCH_LOG" ]; then tail -3 "$FETCH_LOG" | sed 's/^/    /' >&2; fi
+    fi
+    rm -rf "$tmp"
+    FETCH_LOG=""
+    [ -z "$fail" ] || return 1
+
+    FETCHED_BIN="$HOME/.local/bin/$name"
+    return 0
+}
+
+# This process already has ~/.local/bin on PATH, but the user's shell may not.
+local_bin_note() {
+    case ":${PATH_BEFORE:-$PATH}:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) info "Add $HOME/.local/bin to your PATH so your shell finds $1 too." ;;
+    esac
+}
+
+# -- Upstream fallbacks -------------------------------------------------------
+# Some of what install.sh offers is missing from perfectly current distros:
+# fastfetch has no package in Debian 12 or 13, and Ubuntu only got one in
+# 24.10. A package named here has a function that installs it from the
+# project's own release instead, so a missing package is a different route
+# rather than a failed run.
+declare -A PKG_FALLBACK=( [fastfetch]="fastfetch_install" )
+
+has_fallback() { [ -n "${PKG_FALLBACK[$1]:-}" ]; }
+
+# Install $1 the other way. Returns 1 when there is no fallback for it, or the
+# fallback itself failed.
+pkg_fallback() {
+    local fn="${PKG_FALLBACK[$1]:-}"
+    [ -n "$fn" ] || return 1
+    if [ "$DRY_RUN" -eq 1 ]; then
+        info "  [dry-run] fetch $1 from its upstream release into $HOME/.local/bin"
+        return 0
+    fi
+    "$fn"
+}
+
+# Bumping this is the whole maintenance cost of the fastfetch fallback; the
+# asset names have been stable across the 2.x line. Overridable from the
+# environment, so pinning a different release needs no edit.
+FASTFETCH_VERSION="${FASTFETCH_VERSION:-2.68.1}"
+fastfetch_install() {
+    local arch url
+    case "$(uname -m)" in
+        x86_64)          arch=amd64 ;;
+        aarch64 | arm64) arch=aarch64 ;;
+        armv7l)          arch=armv7l ;;
+        *) err "No fastfetch build for $(uname -m)."; return 1 ;;
+    esac
+    url="https://github.com/fastfetch-cli/fastfetch/releases/download/$FASTFETCH_VERSION/fastfetch-linux-$arch.tar.gz"
+
+    fetch_static_bin fastfetch "$url" "fastfetch $FASTFETCH_VERSION" || return 1
+    ok "Installed fastfetch to $FETCHED_BIN"
+    local_bin_note fastfetch
+}
+
 # -- gum ----------------------------------------------------------------------
 # gum draws a far nicer menu than we can, so it is the preferred front end. It
 # is not in every distro's repos though (Debian 12, Ubuntu 24.04, Fedora and
@@ -392,21 +541,10 @@ export GUM_CHOOSE_CURSOR_FOREGROUND="${GUM_CHOOSE_CURSOR_FOREGROUND:-#FF5FAF}"
 export GUM_CHOOSE_SELECTED_FOREGROUND="${GUM_CHOOSE_SELECTED_FOREGROUND:-#5FFFAF}"
 export GUM_CHOOSE_ITEM_FOREGROUND="${GUM_CHOOSE_ITEM_FOREGROUND:-}"
 
-# One step of the gum install, drawn on the shared progress bar. The command's
-# own output goes to the log, where it cannot scribble over the bar's line.
-GUM_LOG=""
-GUM_STEPS=3
-gum_step() {
-    local n="$1" verb="$2"; shift 2
-    progress_bar "$n" "$GUM_STEPS" "gum $GUM_VERSION" "$verb"
-    "$@" >>"$GUM_LOG" 2>&1
-}
-
-# Fetch the upstream static binary into ~/.local/bin. Deliberately not Charm's
-# apt/yum repo: a menu is not worth leaving a third-party package source and
-# signing key on someone's machine, and this needs no root.
+# Fetch the upstream static binary into ~/.local/bin, via the shared fetch
+# above - same three tiers as everything else that is missing from a distro.
 gum_download() {
-    local arch url tmp found fail=""
+    local arch url
     case "$(uname -m)" in
         x86_64)          arch=x86_64 ;;
         aarch64 | arm64) arch=arm64 ;;
@@ -414,44 +552,10 @@ gum_download() {
     esac
     url="https://github.com/charmbracelet/gum/releases/download/v$GUM_VERSION/gum_${GUM_VERSION}_Linux_${arch}.tar.gz"
 
-    command -v curl &>/dev/null || { err "curl is needed to fetch gum."; return 1; }
-    tmp="$(mktemp -d)"
-    GUM_LOG="$tmp/gum.log"
-
-    # Named steps rather than a byte count: curl's own meter wants the line to
-    # itself, and unpacking and installing are worth showing as well. Failures
-    # are saved and reported after progress_end, so the message lands on a line
-    # of its own instead of on the tail of the bar.
-    if ! gum_step 1 downloading curl -fsSL "$url" -o "$tmp/gum.tgz"; then
-        fail="Could not download gum from $url"
-    elif ! gum_step 2 unpacking tar -xzf "$tmp/gum.tgz" -C "$tmp"; then
-        fail="Could not unpack the gum archive."
-    else
-        found="$(find "$tmp" -type f -name gum | head -1)"
-        if [ -z "$found" ]; then
-            fail="No gum binary inside the archive."
-        else
-            mkdir -p "$HOME/.local/bin"
-            gum_step 3 installing install -m 755 "$found" "$HOME/.local/bin/gum" \
-                || fail="Could not install gum into $HOME/.local/bin."
-        fi
-    fi
-    progress_end
-
-    if [ -n "$fail" ]; then
-        err "$fail"
-        if [ -s "$GUM_LOG" ]; then tail -3 "$GUM_LOG" | sed 's/^/    /' >&2; fi
-    fi
-    rm -rf "$tmp"
-    GUM_LOG=""
-    [ -z "$fail" ] || return 1
-
-    GUM_BIN="$HOME/.local/bin/gum"
+    fetch_static_bin gum "$url" "gum $GUM_VERSION" || return 1
+    GUM_BIN="$FETCHED_BIN"
     ok "Installed gum to $GUM_BIN"
-    case ":$PATH:" in
-        *":$HOME/.local/bin:"*) ;;
-        *) info "Add $HOME/.local/bin to your PATH to use gum directly." ;;
-    esac
+    local_bin_note gum
 }
 
 # Locate gum, installing it if we are allowed to. Returns 1 when we end up

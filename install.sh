@@ -26,6 +26,8 @@ usage() {
 Usage: install.sh [options]
 
 Updates the system and installs packages with the detected package manager.
+Anything the distro has no package for, but which publishes its own static
+build (fastfetch), is fetched into ~/.local/bin instead of failing the run.
 
 With no selection option and a terminal to draw on, install.sh shows a menu of
 the packages below, everything pre-selected - so a bare Enter installs the lot.
@@ -121,7 +123,14 @@ if [ "$DRY_RUN" -eq 1 ]; then
     info "\nUpdating system packages using $PKG_MANAGER..."
     pm_update || die "Failed to update system packages."
     info "\nInstalling: ${PACKAGES[*]}"
-    for pkg in "${PACKAGES[@]}"; do pm_install "$pkg"; done
+    for pkg in "${PACKAGES[@]}"; do
+        pm_install "$pkg"
+        # Whether the repos have it is only knowable after a real update, so
+        # a dry run reports the route it would take rather than guessing.
+        if has_fallback "$pkg"; then
+            info "  [dry-run] if $PKG_MANAGER has no $pkg: fetch its upstream build instead"
+        fi
+    done
     ok "\nInstallation complete!"
     exit 0
 fi
@@ -142,14 +151,34 @@ ok "System packages updated."
 # dependency resolution per package, but it is the only way to know which of
 # them is installing right now - and it makes a failure name exactly one.
 info "\nInstalling ${#PACKAGES[@]} package(s)..."
+INSTALLED=()
 FAILED=()
 FAILED_LOG=()
+FALLBACK=()
+FALLBACK_WHY=()
 n=0
 for pkg in "${PACKAGES[@]}"; do
     n=$((n + 1))
     progress_bar "$n" "${#PACKAGES[@]}" "$pkg"
+
+    # A package with an upstream build is asked about before it is installed:
+    # the repos not having it is normal - no Debian and no Ubuntu before 24.10
+    # ships fastfetch - not a failure worth an error and a log to read.
+    if has_fallback "$pkg" && ! pm_has_pkg "$pkg"; then
+        FALLBACK+=("$pkg")
+        FALLBACK_WHY+=("$PKG_MANAGER has no $pkg package")
+        continue
+    fi
+
     out="$(mktemp -t "atlas-pkg.XXXXXX")"
-    if ! pm_install "$pkg" >"$out" 2>&1; then
+    if pm_install "$pkg" >"$out" 2>&1; then
+        INSTALLED+=("$pkg")
+    elif has_fallback "$pkg"; then
+        # The repos claimed to have it and the install failed anyway - the
+        # upstream build is still worth a try before giving up on it.
+        FALLBACK+=("$pkg")
+        FALLBACK_WHY+=("$PKG_MANAGER could not install $pkg")
+    else
         FAILED+=("$pkg")
         FAILED_LOG+=("$(grep -iE '^(E:|error|warning)' "$out" | tail -3)")
     fi
@@ -158,7 +187,26 @@ for pkg in "${PACKAGES[@]}"; do
 done
 progress_end
 
+# Whatever the package manager could not provide, fetched from the project
+# itself. Each of these draws its own progress, so they run after the bar has
+# finished with the line.
+if [ "${#FALLBACK[@]}" -gt 0 ]; then
+    for n in "${!FALLBACK[@]}"; do
+        pkg="${FALLBACK[$n]}"
+        info "\n${FALLBACK_WHY[$n]}; fetching the upstream build."
+        if pkg_fallback "$pkg"; then
+            INSTALLED+=("$pkg")
+        else
+            FAILED+=("$pkg")
+            FAILED_LOG+=("${FALLBACK_WHY[$n]}, and the upstream build did not install either")
+        fi
+    done
+fi
+
 if [ "${#FAILED[@]}" -gt 0 ]; then
+    # What did go in, first: a partial run is now the common shape of a
+    # failure, and hiding the successes makes it look worse than it is.
+    if [ "${#INSTALLED[@]}" -gt 0 ]; then ok "\nInstalled: ${INSTALLED[*]}"; fi
     err "\nCould not install: ${FAILED[*]}"
     for n in "${!FAILED[@]}"; do
         printf '  %s\n' "${FAILED[$n]}"
@@ -171,5 +219,5 @@ if [ "${#FAILED[@]}" -gt 0 ]; then
 fi
 
 rm -f "$PM_LOG"
-ok "Successfully installed: ${PACKAGES[*]}!"
+ok "Successfully installed: ${INSTALLED[*]}!"
 ok "\nInstallation complete!"
