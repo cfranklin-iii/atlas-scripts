@@ -17,6 +17,7 @@ die()  { err "$*"; exit 1; }
 
 CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
 
+# shellcheck disable=SC2034  # read by restore.sh, not from this file
 declare -A SECTION_DIRS=(
     [fish]="$CFG/fish"
     [fastfetch]="$CFG/fastfetch"
@@ -79,6 +80,7 @@ detect_pkg_manager() {
     fi
 }
 
+# shellcheck disable=SC2034
 declare -A PKG_apt=(    [buildtools]="build-essential"    [kernelheaders]="" )
 # shellcheck disable=SC2034
 declare -A PKG_pacman=( [buildtools]="base-devel"         [kernelheaders]="" )

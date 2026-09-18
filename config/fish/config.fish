@@ -19,6 +19,11 @@ function fish_greeting
     echo " $random_greet "
 end
 
+# CI Helper
+if test -d ~/.local/bin
+    fish_add_path -gp ~/.local/bin
+end
+
 # Make a call to fastfetch (if applicable)
 if status is-interactive; and command -q fastfetch
     fastfetch

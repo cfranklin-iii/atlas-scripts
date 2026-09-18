@@ -1,4 +1,4 @@
-# Atlas Scripts (v1.74)
+# Atlas Scripts (v1.75)
 
 Bootstrap scripts and fish/fastfetch configs for setting up a fresh Linux box.
 
@@ -204,8 +204,10 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
    fastfetch) and `dev` (the distro's compiler toolchain)
  - Uses safe array-based commands (no `eval`); adds `--needed` on pacman so
    already-installed packages are not rebuilt
- - Falls back to installing one package at a time if the batch fails, so a
-   single package missing from your distro's repos doesn't sink the rest
+ - Installs one package at a time, so the count in the progress bar is real and
+   a failure names exactly one package
+ - Fetches the project's own static build for a package your distro has none of
+   (fastfetch), so one missing package doesn't sink the rest of the run
 
 `setup.sh`
  - Selectable configs: `fish-config`, `fish-aliases`, `fish-functions` (grouped
@@ -242,7 +244,9 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
 - **Modern Fastfetch:** Custom UI-like boxed configuration, split into System and
   Hardware panels with colored keys.
 - **Fish Integration:** The fastfetch banner is guarded by `status is-interactive`, so
-  it never writes to the stream and breaks `scp`/`rsync`.
+  it never writes to the stream and breaks `scp`/`rsync`. `config.fish` also adds
+  `~/.local/bin` to `PATH` — fish does not read `~/.profile`, and that is where a
+  fetched fastfetch lands.
 - **Local Overrides:** Drop personal settings in `~/.config/fish/config.local.fish` and
   aliases in `~/.config/fish/aliases.local.fish`. These are auto-sourced by the managed
   files and are never overwritten by `setup.sh`.
@@ -254,8 +258,8 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
   verify that `lib/common.sh` actually loaded, and the NVIDIA installer downloads into a
   temp dir cleaned up via `trap`.
 - **Tested in CI:** Every push runs shellcheck, a bash/fish syntax pass, a unit test of
-  the menu's input grammar, and a smoke test that deploys the configs into a scratch
-  `$HOME` and restores them again.
+  the menu's input grammar, install.sh's fallback driven by a fake package manager, and a
+  smoke test that deploys the configs into a scratch `$HOME` and restores them again.
 
 ### Nano
 
@@ -263,17 +267,12 @@ Put your `nanorc` in `config/nano/nanorc` and any syntax definitions in
 `config/nano/syntax/*.nanorc`. `setup.sh` deploys them to
 `~/.config/nano/nanorc` and `~/.config/nano/syntax/`.
 
-Everything in `config/nano/nanorc` above this marker is copied verbatim:
-
-```
-## --- atlas-scripts: generated includes below, do not edit ---
-```
-
-Below it, `setup.sh` regenerates one `include` line per syntax file, with
-absolute paths — which is why it is generated rather than tracked, and why
-`--link` does not apply to that one file. Dropping a new `.nanorc` into
-`config/nano/syntax/` and re-running `setup.sh` is the whole workflow; nothing
-else needs editing.
+`config/nano/nanorc` is copied verbatim, then one `include` line per syntax
+file is appended, with absolute paths — which is why that one file is generated
+rather than tracked, and why `--link` does not apply to it. The whole block is
+rebuilt from the tracked file on every run, so nothing accumulates. Dropping a
+new `.nanorc` into `config/nano/syntax/` and re-running `setup.sh` is the whole
+workflow; nothing else needs editing.
 
 Note that nano reads `~/.nanorc` in preference to the XDG path, so `setup.sh`
 warns if one exists — it would silently win over the deployed config.

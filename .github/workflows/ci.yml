@@ -8,6 +8,12 @@ on:
 env:
   SCRIPTS: install.sh setup.sh nvidia.sh restore.sh lib/common.sh
 
+defaults:
+  run:
+    # -u and -o pipefail as well as -e: a step like `./install.sh | tee out`
+    # reports tee's status, so it could pass while install.sh was failing.
+    shell: bash -euo pipefail {0}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
