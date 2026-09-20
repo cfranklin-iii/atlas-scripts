@@ -23,7 +23,9 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck fish fastfetch
+          sudo apt-get install -y shellcheck fish
+          ./install.sh --only fastfetch </dev/null
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Shellcheck
         run: shellcheck --severity=style $SCRIPTS
@@ -257,7 +259,9 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y fish fastfetch nano
+          sudo apt-get install -y fish nano
+          ./install.sh --only fastfetch </dev/null
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: setup.sh --dry-run changes nothing
         run: |
