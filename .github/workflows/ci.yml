@@ -323,7 +323,8 @@ jobs:
         run: |
           export HOME="$RUNNER_TEMP/only" XDG_CONFIG_HOME="$RUNNER_TEMP/only/.config"
           mkdir -p "$HOME"
-          ./setup.sh --list | grep -q fish-aliases
+          list_out="$(./setup.sh --list)"
+          grep -q fish-aliases <<<"$list_out"
           ./setup.sh --only fastfetch
           [ -f "$XDG_CONFIG_HOME/fastfetch/config.jsonc" ] || { echo "fastfetch missing"; exit 1; }
           if [ -d "$XDG_CONFIG_HOME/fish" ]; then echo "--only fastfetch touched fish"; exit 1; fi
