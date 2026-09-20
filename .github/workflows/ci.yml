@@ -33,6 +33,7 @@ jobs:
           for f in $SCRIPTS; do
               bash -n "$f"
           done
+          bash -n config/neofetch/config.conf
 
       - name: Fish syntax
         run: |
@@ -159,37 +160,83 @@ jobs:
           echo "pm_has_pkg OK"
           '
 
-      - name: install.sh falls back to the upstream fastfetch
-        # This runner has a fastfetch package, so the fallback is driven with a
-        # fake apt that says it does not - the shape of Debian 12 and of Ubuntu
-        # before 24.10, which is the case this whole path exists for. The fake
-        # sudo keeps the run off the real system.
+      - name: install.sh fallback chain
         run: |
           mkdir -p "$RUNNER_TEMP/fbbin"
-          printf '%s\n' '#!/bin/sh' \
-              'case "$*" in' \
-              '    *fastfetch*) echo "E: Unable to locate package fastfetch" >&2; exit 100 ;;' \
-              '    *) exit 0 ;;' \
-              'esac' > "$RUNNER_TEMP/fbbin/apt-get"
           printf '%s\n' '#!/bin/sh' '[ "$1" = -v ] && exit 0' 'exec "$@"' \
               > "$RUNNER_TEMP/fbbin/sudo"
-          chmod +x "$RUNNER_TEMP/fbbin/apt-get" "$RUNNER_TEMP/fbbin/sudo"
+          chmod +x "$RUNNER_TEMP/fbbin/sudo"
 
-          export HOME="$RUNNER_TEMP/fallback" PATH="$RUNNER_TEMP/fbbin:$PATH"
+          make_fake_apt() {
+              cat > "$RUNNER_TEMP/fbbin/apt-get" <<'SCRIPT'
+          #!/bin/sh
+          case "$*" in
+              *install*"fastfetch"*)
+                  if [ "$1" = install ] && [ "$2" != -s ] && \
+                     [ "${FAKE_FASTFETCH_INSTALL:-ok}" != ok ]; then
+                      exit 42
+                  fi
+                  [ "${FAKE_FASTFETCH:-reject}" = accept ] && exit 0
+                  echo "E: Unable to locate package fastfetch" >&2
+                  exit 100 ;;
+              *install*"neofetch"*)
+                  if [ "${FAKE_NEOFETCH:-ok}" != ok ]; then
+                      echo "E: Unable to locate package neofetch" >&2
+                      exit 100
+                  fi
+                  mkdir -p "$HOME/.local/bin"
+                  printf '%s\n' '#!/bin/sh' 'echo Neofetch' > "$HOME/.local/bin/neofetch"
+                  chmod +x "$HOME/.local/bin/neofetch"
+                  exit 0 ;;
+              *) exit 0 ;;
+          esac
+          SCRIPT
+              chmod +x "$RUNNER_TEMP/fbbin/apt-get"
+          }
+
+          export PATH="$RUNNER_TEMP/fbbin:$PATH"
+
+          # Case A: no fastfetch package, so the real upstream static build
+          # should be downloaded and installed.
+          export HOME="$RUNNER_TEMP/fallback-a" FAKE_FASTFETCH=reject \
+              FAKE_NEOFETCH=ok
           mkdir -p "$HOME"
-          ./install.sh --only tools </dev/null | tee "$RUNNER_TEMP/fb.out"
-
-          grep -q "no fastfetch package" "$RUNNER_TEMP/fb.out" \
-              || { echo "the fallback never reported why it ran"; exit 1; }
-          grep -q "Successfully installed:.*fastfetch" "$RUNNER_TEMP/fb.out" \
-              || { echo "fastfetch missing from the installed list"; exit 1; }
+          make_fake_apt
+          ./install.sh --only fastfetch </dev/null | tee "$RUNNER_TEMP/fb-a.out"
+          grep -q "no fastfetch package" "$RUNNER_TEMP/fb-a.out"
+          grep -q "Successfully installed: fastfetch" "$RUNNER_TEMP/fb-a.out"
           "$HOME/.local/bin/fastfetch" --version
 
-          # A fallback that cannot download must fail that package alone, and
-          # still report the ones that went in.
-          rm -rf "$HOME"; mkdir -p "$HOME"
-          out="$(FASTFETCH_VERSION=0.0.0-nope ./install.sh --only tools </dev/null 2>&1)" \
-              && { echo "a failed fallback should exit non-zero"; exit 1; }
+          # Case B: the upstream version is unavailable, so neofetch is used.
+          export HOME="$RUNNER_TEMP/fallback-b" FASTFETCH_VERSION=0.0.0-nope \
+              FAKE_FASTFETCH=reject FAKE_NEOFETCH=ok
+          mkdir -p "$HOME"
+          make_fake_apt
+          ./install.sh --only tools </dev/null | tee "$RUNNER_TEMP/fb-b.out"
+          grep -q "Successfully installed: tree btop fastfetch" "$RUNNER_TEMP/fb-b.out"
+          grep -q "Installed neofetch as the fastfetch fallback" "$RUNNER_TEMP/fb-b.out"
+          command -v neofetch >/dev/null || [ -x "$HOME/.local/bin/neofetch" ]
+
+          # Case C: fastfetch is advertised by apt but its install fails.
+          export HOME="$RUNNER_TEMP/fallback-c" FASTFETCH_VERSION=0.0.0-nope \
+              FAKE_FASTFETCH=accept FAKE_FASTFETCH_INSTALL=fail FAKE_NEOFETCH=ok
+          mkdir -p "$HOME"
+          make_fake_apt
+          ./install.sh --only fastfetch </dev/null | tee "$RUNNER_TEMP/fb-c.out"
+          grep -q "could not install fastfetch" "$RUNNER_TEMP/fb-c.out"
+          grep -q "Installed neofetch as the fastfetch fallback" "$RUNNER_TEMP/fb-c.out"
+          grep -q "Successfully installed: fastfetch" "$RUNNER_TEMP/fb-c.out"
+          [ -x "$HOME/.local/bin/neofetch" ]
+
+          # Case D: both fastfetch routes and neofetch fail, but other tools
+          # still complete and appear in the partial-install report.
+          export HOME="$RUNNER_TEMP/fallback-d" FASTFETCH_VERSION=0.0.0-nope \
+              FAKE_FASTFETCH=reject FAKE_NEOFETCH=fail
+          mkdir -p "$HOME"
+          make_fake_apt
+          out="$(./install.sh --only tools </dev/null 2>&1)" && {
+              echo "everything-fails case unexpectedly succeeded"; exit 1;
+          }
           printf '%s\n' "$out"
           grep -q "Could not install: fastfetch" <<<"$out"
           grep -q "Installed: tree btop" <<<"$out"

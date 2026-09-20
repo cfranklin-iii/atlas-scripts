@@ -24,13 +24,14 @@ if test -d ~/.local/bin
     fish_add_path -gp ~/.local/bin
 end
 
-# Make a call to fastfetch (if applicable)
+# Make a call to fastfetch, or neofetch if fastfetch is unavailable.
 if status is-interactive; and command -q fastfetch
     fastfetch
+else if status is-interactive; and command -q neofetch
+    neofetch
 end
 
 # Load machine-specific config overrides
 if test -f "$__fish_config_dir/config.local.fish"
     source "$__fish_config_dir/config.local.fish"
 end
-

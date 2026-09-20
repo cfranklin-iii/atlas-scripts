@@ -17,7 +17,7 @@ MENU_ITEMS=(
     "fish-functions|Configs|functions/*.fish|"
     "nano-config|Configs|nano/nanorc|"
     "nano-syntax|Configs|nano/syntax/*.nanorc|"
-    "fastfetch|Configs|fastfetch/config.jsonc|"
+    "fastfetch|Configs|fastfetch/config.jsonc (or neofetch fallback)|"
     "git|Configs|user.name, user.email, init.defaultBranch|"
 )
 
@@ -61,13 +61,10 @@ while [ $# -gt 0 ]; do
 done
 sel_check
 
-# Back up whatever is at $1, if anything, to a timestamped .bak.
 backup() {
     local dest="$1" stamp bak n=1
     [ -e "$dest" ] || [ -L "$dest" ] || return 0
     stamp="$dest.bak.$(date +%Y%m%d%H%M%S)"
-    # Two backups inside the same second would otherwise overwrite each other,
-    # which is exactly what a backup must not do.
     bak="$stamp"
     while [ -e "$bak" ]; do
         bak="$stamp.$n"
@@ -77,7 +74,6 @@ backup() {
     info "Backed up $dest -> $(basename "$bak")"
 }
 
-# Deploy one tracked file, backing up anything it replaces.
 install_file() {
     local src="$1" dest="$2" nolink="${3:-}"
 
@@ -92,8 +88,6 @@ install_file() {
         return 0
     fi
 
-    # Identical content means there is nothing to replace, and nothing worth
-    # backing up - otherwise every re-run leaves another .bak behind.
     if [ -f "$dest" ] && [ ! -L "$dest" ] && cmp -s "$src" "$dest"; then
         info "Up to date: $dest"
         return 0
@@ -103,7 +97,6 @@ install_file() {
     did "Installed $dest"
 }
 
-# Create a local-overrides template only if it is missing (never overwrite).
 create_local() {
     [ -f "$1" ] && return 0
     if [ "$DRY_RUN" -eq 1 ]; then
@@ -227,7 +220,16 @@ deploy_nano_syntax() {
 }
 
 deploy_fastfetch() {
-    need_cmd fastfetch "fastfetch config" || return 0
+    if ! command -v fastfetch &>/dev/null; then
+        if command -v neofetch &>/dev/null; then
+            info "\nInstalling neofetch config..."
+            run mkdir -p "$CFG/neofetch"
+            install_file "$CONFIG_DIR/neofetch/config.conf" "$CFG/neofetch/config.conf"
+        else
+            err "fastfetch not installed, skipping fastfetch config."
+        fi
+        return 0
+    fi
     info "\nInstalling fastfetch config..."
     run mkdir -p "$CFG/fastfetch"
     install_file "$CONFIG_DIR/fastfetch/config.jsonc" "$CFG/fastfetch/config.jsonc"

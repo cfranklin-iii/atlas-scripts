@@ -1,6 +1,6 @@
-# Atlas Scripts (v1.75)
+# Atlas Scripts (v1.76)
 
-Bootstrap scripts and fish/fastfetch configs for setting up a fresh Linux box.
+Bootstrap scripts and fish/fastfetch/neofetch configs for setting up a fresh Linux box.
 
 ### Quick start
 
@@ -32,7 +32,7 @@ Select configs to deploy:
 > ✓ Configs    fish-config      config.fish, local overrides, login shell
   ✓ Configs    fish-aliases     conf.d/aliases.fish and local overrides
   ✓ Configs    fish-functions   functions/*.fish
-  ✓ Configs    fastfetch        fastfetch/config.jsonc
+  ✓ Configs    fastfetch        fastfetch/config.jsonc (or neofetch fallback)
   ✓ Configs    git              user.name, user.email, init.defaultBranch
 
 x toggle • ←↓↑→ navigate • enter submit • ctrl+a select all
@@ -127,7 +127,8 @@ lets a failure name exactly one package.
 **fastfetch** is missing from distros people actually run: Debian 12 and 13
 have no package at all, and Ubuntu only got one in 24.10. Rather than fail the
 run over it, `install.sh` asks the package manager first, and fetches the
-project's own static build into `~/.local/bin` when the answer is no:
+project's own static build into `~/.local/bin` when the answer is no. If that
+download fails, it installs **neofetch** from the distro as a final fallback:
 
 ```
 apt has no fastfetch package; fetching the upstream build.
@@ -144,8 +145,12 @@ wins over it:
 FASTFETCH_VERSION=2.60.0 ./install.sh --only fastfetch
 ```
 
-If the download fails as well, that package — and only that package — is
-reported as failed; everything else is already installed, and the run says so.
+`FASTFETCH_VERSION` overrides the pinned upstream release, which is useful for
+testing or choosing a different release. If the download fails, `neofetch` is
+installed when the distro provides it, the matching config is deployed, and the
+Fish banner uses it. If both fallbacks fail, that package — and only that package
+— is reported as failed; everything else is already installed, and the run
+says so.
 Every script puts `~/.local/bin` on its own `PATH`, so `setup.sh` deploys the
 fastfetch config straight afterwards even if your shell does not have that
 directory yet. It is worth adding to your `PATH` regardless, which the install
@@ -194,7 +199,7 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
    or `gcc make` without any script having to know the difference
 
 `config/`
- - The tracked dotfiles themselves (`fish/`, `fastfetch/`, `nano/`), deployed by
+ - The tracked dotfiles themselves (`fish/`, `fastfetch/`, `neofetch/`, `nano/`), deployed by
    `setup.sh`.
 
 `install.sh`
@@ -207,7 +212,7 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
  - Installs one package at a time, so the count in the progress bar is real and
    a failure names exactly one package
  - Fetches the project's own static build for a package your distro has none of
-   (fastfetch), so one missing package doesn't sink the rest of the run
+   (fastfetch), then falls back to neofetch if the upstream build is unavailable
 
 `setup.sh`
  - Selectable configs: `fish-config`, `fish-aliases`, `fish-functions` (grouped
@@ -217,7 +222,8 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
  - Skips with a warning — not an error — if the tool for a config isn't installed
  - Backs up any existing configs to a timestamped `.bak` (never clobbers a previous backup)
  - Creates `config.local.fish` / `aliases.local.fish` for machine-specific overrides (never overwritten)
- - Deploys a custom **boxed-style** fastfetch config to `~/.config/fastfetch/config.jsonc`
+ - Deploys a custom **boxed-style** fastfetch config, or the matching neofetch
+   config, when fastfetch is unavailable
  - Prompts & configures git global user name and email if not already set
    (an empty answer or a non-interactive shell just leaves the key unset)
 
@@ -238,9 +244,10 @@ Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
 ### Key Features
 - **Pick What You Want:** A gum checkbox menu for packages and configs, with sets
   for the common groupings — and flags for when you'd rather not be asked at all.
-- **Degrades Gracefully:** gum is installed on demand, but nothing depends on it.
-  No gum, no network, no terminal — each case has a defined fallback, and only a
-  terminal is ever actually required.
+- **Degrades Gracefully:** gum is installed on demand, and fastfetch falls back
+  through its upstream build to neofetch. No gum, no network, no terminal —
+  each case has a defined fallback, and only a terminal is ever actually
+  required.
 - **Modern Fastfetch:** Custom UI-like boxed configuration, split into System and
   Hardware panels with colored keys.
 - **Fish Integration:** The fastfetch banner is guarded by `status is-interactive`, so

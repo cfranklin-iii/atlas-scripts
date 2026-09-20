@@ -21,16 +21,10 @@ CFG="${XDG_CONFIG_HOME:-$HOME/.config}"
 declare -A SECTION_DIRS=(
     [fish]="$CFG/fish"
     [fastfetch]="$CFG/fastfetch"
+    [neofetch]="$CFG/neofetch"
     [nano]="$CFG/nano"
 )
 
-# A package the distro does not have is installed into ~/.local/bin instead
-# (see "Upstream fallbacks" below), and not every distro has that on PATH.
-# Adding it here, for this process only, means a binary installed by one of
-# these scripts is found by the same run that installed it - and by setup.sh
-# afterwards, which deploys a config only for a tool it can see. The original
-# is kept so local_bin_note() can tell whether the user's own shell would have
-# found the binary without our help.
 PATH_BEFORE="$PATH"
 if [ -d "$HOME/.local/bin" ]; then
     case ":$PATH:" in
@@ -49,8 +43,6 @@ run() {
     fi
 }
 
-# ok(), but silent during a dry run - run() has already narrated the action,
-# and claiming it was done would be a lie. Always returns 0 for `set -e`.
 did() { [ "$DRY_RUN" -eq 1 ] || ok "$*"; return 0; }
 
 have_tty() { [ -t 0 ]; }
@@ -92,7 +84,6 @@ declare -A PKG_zypper=( [buildtools]="gcc make"           [kernelheaders]="kerne
 resolve_pkg() {
     [ -n "$PKG_MANAGER" ] || die "resolve_pkg called before detect_pkg_manager"
     local -n __pkg_map="PKG_${PKG_MANAGER}"
-    # '-' rather than ':-', so a deliberately empty mapping stays empty.
     printf '%s\n' "${__pkg_map[$1]-$1}"
 }
 
@@ -100,7 +91,7 @@ pm_refresh() {
     case "$PKG_MANAGER" in
         apt)    run sudo apt-get update ;;
         pacman) run sudo pacman -Syu --noconfirm ;;
-        dnf)    ;;  # dnf refreshes metadata on its own schedule
+        dnf)    ;;
         zypper) run sudo zypper --non-interactive refresh ;;
     esac
 }
@@ -109,7 +100,7 @@ pm_update() {
     pm_refresh || return 1
     case "$PKG_MANAGER" in
         apt)    run sudo apt-get full-upgrade -y ;;
-        pacman) ;;  # the -Syu in pm_refresh already upgraded
+        pacman) ;;
         dnf)    run sudo dnf -y upgrade --refresh ;;
         zypper) run sudo zypper --non-interactive update ;;
     esac
@@ -124,14 +115,8 @@ pm_install() {
     esac
 }
 
-# Can the package manager actually install $1? Asked only about packages that
-# have an upstream fallback, where knowing in advance turns an alarming install
-# failure into a deliberate choice of route. Every form below is a read-only
-# metadata query and needs no root.
 pm_has_pkg() {
     case "$PKG_MANAGER" in
-        # A simulated install rather than apt-cache policy: it needs no
-        # parsing of output that some locales translate.
         apt)    apt-get install -s -qq -- "$1" &>/dev/null ;;
         pacman) pacman -Si -- "$1" &>/dev/null ;;
         dnf)    dnf -q info -- "$1" &>/dev/null ;;
@@ -222,36 +207,11 @@ sudo_prime() {
     sudo -v || die "sudo is required to install packages."
 }
 
-# -- Multi-select menu --------------------------------------------------------
-# A checkbox menu shared by install.sh, setup.sh and restore.sh.
-#
-#   ms_load <item>...   then   choose <out-array-name> <title>
-#     item := "key|section|label|members"
-#
-# A row with empty `members` is a leaf and holds the actual on/off state. A row
-# with members is a set: it holds no state of its own, rendering [x] when all
-# its members are on, [~] when some are and [ ] when none, and toggling it
-# drives every member to the new value. Deriving set state rather than storing
-# it is what stops the two tiers from ever disagreeing.
-#
-# `section` prints as a heading whenever it changes, so grouping is controlled
-# purely by the order the caller passes items in.
-#
-# Menu and prompt both go to stderr - bash writes `read -p` there anyway, so
-# this keeps the two from interleaving and leaves stdout clean for --list.
-
 MS_KEY=(); MS_SECTION=(); MS_LABEL=(); MS_MEMBERS=(); MS_STATE=()
 declare -A MS_INDEX=()
 
-# Where every way of picking rows leaves its answer. A shared buffer rather
-# than stdout: a command substitution would run these in a subshell, where a
-# `die` on an unknown name exits only that subshell and lets the script carry
-# on with a short list.
 SEL_EXPANDED=()
 
-# Parse item records into the MS_* arrays, everything pre-selected so that a
-# bare Enter reproduces the all-inclusive behaviour these scripts had before
-# the menu existed.
 ms_load() {
     MS_KEY=(); MS_SECTION=(); MS_LABEL=(); MS_MEMBERS=(); MS_STATE=(); MS_INDEX=()
     local item rest key
@@ -268,7 +228,6 @@ ms_load() {
     done
 }
 
-# How much of set row $1 is selected: 2 = all, 1 = some, 0 = none.
 ms_set_state() {
     local m j on=0 total=0
     local -a members=()
@@ -288,8 +247,6 @@ ms_set_state() {
     fi
 }
 
-# Flip row $1. A set drives all its members to the same new value; a partly
-# selected set fills up first, which is the least surprising direction.
 ms_toggle_row() {
     local i="$1" new m j
     local -a members=()
@@ -307,7 +264,6 @@ ms_toggle_row() {
     return 0
 }
 
-# Drive every leaf to $1 (0 or 1), or flip them all when $1 is `invert`.
 ms_set_all() {
     local i
     for i in "${!MS_STATE[@]}"; do
@@ -320,10 +276,6 @@ ms_set_all() {
     done
 }
 
-# Apply one line of menu input to MS_STATE. Split out from the menu loop so the
-# token grammar can be exercised in CI without a terminal.
-# Returns 0 if every token was understood, 1 if any was rejected (the good ones
-# still apply - a typo should not discard the rest of the line), 2 to quit.
 ms_apply_tokens() {
     local tok lo hi i rc=0
     local -a toks=()
@@ -334,15 +286,14 @@ ms_apply_tokens() {
             n | N | none)   ms_set_all 0 ;;
             v | V | invert) ms_set_all invert ;;
             q | Q | quit)   return 2 ;;
-            *[!0-9-]*)  # a row name - matched after the single-letter commands,
-                        # so a row keyed 'a', 'n', 'v' or 'q' is unreachable by name
+            *[!0-9-]*)
                 i="${MS_INDEX[$tok]:-}"
                 if [ -n "$i" ]; then
                     ms_toggle_row "$i"
                 else
                     err "Not a valid choice: $tok"; rc=1
                 fi ;;
-            *-*)        # numeric range
+            *-*)
                 lo="${tok%%-*}"; hi="${tok##*-}"
                 if [ -z "$lo" ] || [ -z "$hi" ] \
                     || [ -n "${lo//[0-9]/}" ] || [ -n "${hi//[0-9]/}" ] \
@@ -351,7 +302,7 @@ ms_apply_tokens() {
                     err "Bad range: $tok"; rc=1; continue
                 fi
                 for ((i = lo; i <= hi; i++)); do ms_toggle_row "$((i - 1))"; done ;;
-            *)          # a single row number
+            *)
                 if [ "$tok" -ge 1 ] && [ "$tok" -le "${#MS_KEY[@]}" ]; then
                     ms_toggle_row "$((tok - 1))"
                 else
@@ -362,8 +313,6 @@ ms_apply_tokens() {
     return "$rc"
 }
 
-# Draw the menu. Reprints rather than moving the cursor, so line wrapping and
-# scrollback both stay sane.
 ms_render() {
     local i mark last=$'\001'
     printf '\n%b%s%b\n\n' "$YELLOW" "$1" "$NC" >&2
@@ -391,7 +340,6 @@ ms_render() {
         'a=all  n=none  v=invert  q=quit  Enter=confirm' >&2
 }
 
-# Run the menu until the user confirms. Returns 1 if they quit.
 multiselect() {
     local line rc
     while true; do
@@ -413,17 +361,12 @@ multiselect() {
 FETCH_LOG=""
 FETCH_STEPS=3
 
-# One step of a fetch, drawn on the shared progress bar. The command's own
-# output goes to the log, where it cannot scribble over the bar's line.
 fetch_step() {
     local n="$1" verb="$2" label="$3"; shift 3
     progress_bar "$n" "$FETCH_STEPS" "$label" "$verb"
     "$@" >>"$FETCH_LOG" 2>&1
 }
 
-# Fetch the .tar.gz at $2, find the executable named $1 inside it and install
-# that into ~/.local/bin. $3 labels the progress bar. Sets FETCHED_BIN to the
-# installed path on success.
 FETCHED_BIN=""
 fetch_static_bin() {
     local name="$1" url="$2" label="$3"
@@ -435,18 +378,11 @@ fetch_static_bin() {
     tmp="$(mktemp -d)"
     FETCH_LOG="$tmp/fetch.log"
 
-    # Named steps rather than a byte count: curl's own meter wants the line to
-    # itself, and unpacking and installing are worth showing as well. Failures
-    # are saved and reported after progress_end, so the message lands on a line
-    # of its own instead of on the tail of the bar.
     if ! fetch_step 1 downloading "$label" curl -fsSL "$url" -o "$tmp/dl.tgz"; then
         fail="Could not download $name from $url"
     elif ! fetch_step 2 unpacking "$label" tar -xzf "$tmp/dl.tgz" -C "$tmp"; then
         fail="Could not unpack the $name archive."
     else
-        # bin/ and the executable bit first, because these archives also ship
-        # a shell completion named after the tool. -print -quit rather than
-        # `| head -1`, which would hand find a closed pipe.
         found="$(find "$tmp" -type f -perm -u+x -path "*bin/$name" -print -quit)"
         if [ -z "$found" ]; then
             found="$(find "$tmp" -type f -perm -u+x -name "$name" -print -quit)"
@@ -474,7 +410,6 @@ fetch_static_bin() {
     return 0
 }
 
-# This process already has ~/.local/bin on PATH, but the user's shell may not.
 local_bin_note() {
     case ":${PATH_BEFORE:-$PATH}:" in
         *":$HOME/.local/bin:"*) ;;
@@ -482,18 +417,10 @@ local_bin_note() {
     esac
 }
 
-# -- Upstream fallbacks -------------------------------------------------------
-# Some of what install.sh offers is missing from perfectly current distros:
-# fastfetch has no package in Debian 12 or 13, and Ubuntu only got one in
-# 24.10. A package named here has a function that installs it from the
-# project's own release instead, so a missing package is a different route
-# rather than a failed run.
 declare -A PKG_FALLBACK=( [fastfetch]="fastfetch_install" )
 
 has_fallback() { [ -n "${PKG_FALLBACK[$1]:-}" ]; }
 
-# Install $1 the other way. Returns 1 when there is no fallback for it, or the
-# fallback itself failed.
 pkg_fallback() {
     local fn="${PKG_FALLBACK[$1]:-}"
     [ -n "$fn" ] || return 1
@@ -504,10 +431,29 @@ pkg_fallback() {
     "$fn"
 }
 
-# Bumping this is the whole maintenance cost of the fastfetch fallback; the
-# asset names have been stable across the 2.x line. Overridable from the
-# environment, so pinning a different release needs no edit.
 FASTFETCH_VERSION="${FASTFETCH_VERSION:-2.68.1}"
+fastfetch_neofetch_fallback() {
+    if [ -z "${PKG_MANAGER:-}" ] && ! detect_pkg_manager; then
+        err "Could not detect a package manager for the neofetch fallback."
+        return 1
+    fi
+    if ! pm_install neofetch; then
+        err "Could not install neofetch as the fastfetch fallback."
+        return 1
+    fi
+    if [ -d "$HOME/.local/bin" ]; then
+        case ":$PATH:" in
+            *":$HOME/.local/bin:"*) ;;
+            *) PATH="$HOME/.local/bin:$PATH"; export PATH ;;
+        esac
+    fi
+    if ! command -v neofetch &>/dev/null; then
+        err "The package manager installed neofetch, but no neofetch command was found."
+        return 1
+    fi
+    ok "Installed neofetch as the fastfetch fallback."
+}
+
 fastfetch_install() {
     local arch url
     case "$(uname -m)" in
@@ -518,7 +464,10 @@ fastfetch_install() {
     esac
     url="https://github.com/fastfetch-cli/fastfetch/releases/download/$FASTFETCH_VERSION/fastfetch-linux-$arch.tar.gz"
 
-    fetch_static_bin fastfetch "$url" "fastfetch $FASTFETCH_VERSION" || return 1
+    if ! fetch_static_bin fastfetch "$url" "fastfetch $FASTFETCH_VERSION"; then
+        fastfetch_neofetch_fallback
+        return $?
+    fi
     ok "Installed fastfetch to $FETCHED_BIN"
     local_bin_note fastfetch
 }

@@ -27,7 +27,8 @@ Usage: install.sh [options]
 
 Updates the system and installs packages with the detected package manager.
 Anything the distro has no package for, but which publishes its own static
-build (fastfetch), is fetched into ~/.local/bin instead of failing the run.
+build (fastfetch), is fetched into ~/.local/bin; if that fails, neofetch is
+installed as a final fallback instead of failing the run.
 
 With no selection option and a terminal to draw on, install.sh shows a menu of
 the packages below, everything pre-selected - so a bare Enter installs the lot.
@@ -128,7 +129,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
         # Whether the repos have it is only knowable after a real update, so
         # a dry run reports the route it would take rather than guessing.
         if has_fallback "$pkg"; then
-            info "  [dry-run] if $PKG_MANAGER has no $pkg: fetch its upstream build instead"
+            info "  [dry-run] if $PKG_MANAGER has no $pkg: fetch its upstream build, then try neofetch"
         fi
     done
     ok "\nInstallation complete!"
