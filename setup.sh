@@ -132,6 +132,11 @@ set_login_shell() {
     fish_path="$(command -v fish)"
     [ "${SHELL:-}" = "$fish_path" ] && return 0
 
+    if ! have_tty && [ "$ASSUME_YES" -eq 0 ]; then
+        info "Non-interactive: leaving the login shell unchanged (use --yes to opt in)."
+        return 0
+    fi
+
     if ! grep -qxF "$fish_path" /etc/shells 2>/dev/null; then
         info "$fish_path is not listed in /etc/shells; adding it needs sudo."
         run sudo tee -a /etc/shells <<<"$fish_path" >/dev/null || {

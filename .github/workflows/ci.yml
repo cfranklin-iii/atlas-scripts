@@ -2,8 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   SCRIPTS: install.sh setup.sh nvidia.sh restore.sh lib/common.sh
@@ -23,7 +30,7 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y shellcheck fish
+          sudo apt-get install -y shellcheck fish jq yamllint
           ./install.sh --only fastfetch </dev/null
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
@@ -45,8 +52,30 @@ jobs:
 
       - name: Fastfetch config is valid
         run: |
-          python3 -c "import json; json.load(open('config/fastfetch/config.jsonc'))"
+          jq empty config/fastfetch/config.jsonc
           fastfetch --config "$PWD/config/fastfetch/config.jsonc" --pipe >/dev/null
+
+      - name: Workflow YAML is valid
+        run: yamllint -d relaxed .github/workflows/ci.yml
+
+      - name: README local references are valid
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          from urllib.parse import unquote, urlparse
+
+          readme = Path("README.md")
+          text = readme.read_text(encoding="utf-8")
+          for target in re.findall(r"\[[^]]+\]\(([^)]+)\)", text):
+              parsed = urlparse(target)
+              if parsed.scheme or target.startswith("#"):
+                  continue
+              path = Path(unquote(parsed.path))
+              if not (readme.parent / path).exists():
+                  raise SystemExit(f"README reference does not exist: {target}")
+          print("README local references OK")
+          PY
 
       - name: Versions agree
         run: |
@@ -149,6 +178,12 @@ jobs:
 
           ! ./install.sh --all --only core </dev/null
           ! ./install.sh --only bogus </dev/null
+
+          # --no-update must suppress package-manager refresh/upgrade commands.
+          ./install.sh --no-update --dry-run --only core </dev/null \
+              | grep -q "Skipping system package update"
+          ! ./install.sh --no-update --dry-run --only core </dev/null \
+              | grep -q "apt-get update"
 
       - name: Package availability check
         run: |
@@ -318,6 +353,17 @@ jobs:
           for s in "fish config" "fish aliases" "fish functions" "fastfetch config"; do
               grep -q "Installing $s" <<<"$out" || { echo "skipped $s"; exit 1; }
           done
+
+      - name: Non-interactive setup does not change the login shell
+        run: |
+          export HOME="$RUNNER_TEMP/noninteractive" XDG_CONFIG_HOME="$RUNNER_TEMP/noninteractive/.config"
+          mkdir -p "$HOME" "$RUNNER_TEMP/noninteractive-bin"
+          printf '#!/bin/sh\nexit 0\n' > "$RUNNER_TEMP/noninteractive-bin/fish"
+          printf '#!/bin/sh\necho "sudo must not run" >&2\nexit 99\n' \
+              > "$RUNNER_TEMP/noninteractive-bin/sudo"
+          chmod +x "$RUNNER_TEMP/noninteractive-bin/fish" "$RUNNER_TEMP/noninteractive-bin/sudo"
+          export PATH="$RUNNER_TEMP/noninteractive-bin:$PATH"
+          ./setup.sh --only fish-config </dev/null
 
       - name: setup.sh --only deploys just that config
         run: |
