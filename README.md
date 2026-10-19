@@ -1,4 +1,4 @@
-# Atlas Scripts (v1.77)
+# Atlas Scripts (v1.78)
 
 Bootstrap scripts and fish/fastfetch/neofetch configs for setting up a fresh Linux box.
 
