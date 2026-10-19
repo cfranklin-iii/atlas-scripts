@@ -1,0 +1,31 @@
+## Syntax highlighting for Python files.
+
+syntax python "\.pyw?$|\.pyi$"
+header "^#!.*\bpython[0-9.]*\b"
+comment "#"
+
+# Definitions and decorators.
+color brightblue "^[[:blank:]]*(async[[:blank:]]+def|def|class)\>"
+color plum "^[[:blank:]]*@[[:alpha:]_][[:alnum:]_.]*"
+
+# Keywords and common builtins.
+color sea "\<(async|await|break|case|continue|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|match|nonlocal|pass|raise|return|try|while|with|yield)\>"
+color sand "\<(False|None|True)\>"
+color brightyellow "\<(and|as|assert|or|not)\>"
+color brightyellow "\<(abs|all|any|bool|bytes|callable|chr|dict|enumerate|filter|float|format|frozenset|getattr|hasattr|hash|hex|int|isinstance|issubclass|iter|len|list|map|max|min|next|object|open|ord|pow|print|range|repr|reversed|round|set|slice|sorted|str|sum|tuple|type|zip)\>"
+color brightyellow "\<(self|cls)\>"
+
+# Strings, numbers, and punctuation.
+color latte "\"([^\"\\]|\\.)*\""
+color sky "'([^'\\]|\\.)*'"
+color sky start="'''" end="'''"
+color sky start="\"\"\"" end="\"\"\""
+color lagoon "\<[0-9]+([eE][+-]?[0-9]+)?[jJ]?\>"
+color lagoon "\<0[xX][[:xdigit:]]+\>"
+color lagoon "\<0[oO][0-7]+\>"
+color lagoon "\<0[bB][01]+\>"
+color bold,sea "[][{}():;,<>*%&|^~!=+-/.]"
+
+# Comments and trailing whitespace.
+color cyan "(^|[[:blank:]])#.*"
+color ,green "[[:space:]]+$"

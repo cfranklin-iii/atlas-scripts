@@ -16,7 +16,7 @@ function fish_greeting
 "   ===   Terminal Runtime Loaded.   ==="
 
     set random_greet $greetings[(math (random 1 (count $greetings)))]
-    echo " $random_greet "
+    echo "$random_greet"
 end
 
 # CI Helper

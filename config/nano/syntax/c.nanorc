@@ -1,0 +1,27 @@
+## Syntax highlighting for C and C++ files.
+
+syntax c "\.(c|h|hh|hpp|hxx|cc|cpp|cxx|ipp)$"
+comment "//|/*|*/"
+
+# Preprocessor directives.
+color brightblue "^[[:blank:]]*#(include|define|undef|ifn?def|if|elif|else|endif|pragma|error|warning)\>"
+
+# Storage classes, keywords, and type names.
+color sea "\<(class|enum|namespace|struct|template|typedef|typename|using|virtual|constexpr|consteval|constinit|explicit|extern|friend|inline|mutable|noexcept|override|private|protected|public|static|static_assert|volatile)\>"
+color sand "\<(bool|char|char8_t|char16_t|char32_t|double|float|int|long|nullptr_t|short|signed|size_t|ssize_t|unsigned|void|wchar_t)\>"
+
+# Common identifiers.
+color brightgreen "^[[:blank:]]*[[:alpha:]_][[:alnum:]_]*[[:blank:]]*\([[:blank:]]*"
+color brightyellow "\<[A-Z_][A-Z0-9_]*\>"
+
+# Strings, characters, numbers, and punctuation.
+color latte "\"([^\"\\]|\\.)*\""
+color sky "'([^'\\]|\\.)*'"
+color lagoon "\<[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?[uUlLfF]*\>"
+color lagoon "\<0[xX][[:xdigit:]]+[uUlLfF]*\>"
+color bold,sea "[][{}():;,<>*%&|^~!=+-]"
+
+# Comments and trailing whitespace.
+color cyan "(^|[[:blank:]])//.*"
+color bold,cyan start="/\*" end="\*/"
+color ,green "[[:space:]]+$"
