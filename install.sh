@@ -21,11 +21,15 @@ declare -A GROUP_DESC=(
     [dev]="compiler toolchain"
 )
 
+UPDATE_SYSTEM=1
+UPDATE_MODE_SET=0
+
 usage() {
     cat <<USAGE
 Usage: install.sh [options]
 
-Updates the system and installs packages with the detected package manager.
+Updates the system and installs packages with the detected package manager by
+default. Use --no-update for automation that must not upgrade the host first.
 Anything the distro has no package for, but which publishes its own static
 build (fastfetch), is fetched into ~/.local/bin; if that fails, neofetch is
 installed as a final fallback instead of failing the run.
@@ -40,12 +44,26 @@ Options:
   -x, --exclude LIST
                   Drop these packages or sets from the selection.
   -L, --list      List the packages and sets, then exit.
+      --update    Explicitly enable the system update step (the default).
+      --no-update Skip system package updates and only install selections.
   -n, --dry-run   Report what would be run without installing anything.
   -h, --help      Show this help.
 USAGE
 }
 
 while [ $# -gt 0 ]; do
+    case "$1" in
+        --update)
+            [ "$UPDATE_MODE_SET" -eq 0 ] || [ "$UPDATE_SYSTEM" -eq 1 ] \
+                || die "--update cannot be combined with --no-update."
+            UPDATE_SYSTEM=1; UPDATE_MODE_SET=1; shift; continue
+            ;;
+        --no-update)
+            [ "$UPDATE_MODE_SET" -eq 0 ] || [ "$UPDATE_SYSTEM" -eq 0 ] \
+                || die "--no-update cannot be combined with --update."
+            UPDATE_SYSTEM=0; UPDATE_MODE_SET=1; shift; continue
+            ;;
+    esac
     if sel_flag "$@"; then
         shift "$SEL_SHIFT"
         continue
@@ -121,8 +139,12 @@ fi
 # --dry-run keeps the old narrated output: there is nothing to show progress
 # for, and run() already describes every command it would have run.
 if [ "$DRY_RUN" -eq 1 ]; then
-    info "\nUpdating system packages using $PKG_MANAGER..."
-    pm_update || die "Failed to update system packages."
+    if [ "$UPDATE_SYSTEM" -eq 1 ]; then
+        info "\nUpdating system packages using $PKG_MANAGER..."
+        pm_update || die "Failed to update system packages."
+    else
+        info "\nSkipping system package update (--no-update)."
+    fi
     info "\nInstalling: ${PACKAGES[*]}"
     for pkg in "${PACKAGES[@]}"; do
         pm_install "$pkg"
@@ -141,12 +163,16 @@ fi
 sudo_prime
 PM_LOG="$(mktemp -t atlas-install.XXXXXX.log)"
 
-if ! spin_run "Updating system packages ($PKG_MANAGER)..." pm_update; then
-    err "Failed to update system packages. Check your network and package manager."
-    info "Log: $PM_LOG"
-    exit 1
+if [ "$UPDATE_SYSTEM" -eq 1 ]; then
+    if ! spin_run "Updating system packages ($PKG_MANAGER)..." pm_update; then
+        err "Failed to update system packages. Check your network and package manager."
+        info "Log: $PM_LOG"
+        exit 1
+    fi
+    ok "System packages updated."
+else
+    info "Skipping system package update (--no-update)."
 fi
-ok "System packages updated."
 
 # One package at a time, so the count in the bar is the real count. It costs a
 # dependency resolution per package, but it is the only way to know which of

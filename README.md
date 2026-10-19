@@ -1,4 +1,4 @@
-# Atlas Scripts (v1.76)
+# Atlas Scripts (v1.77)
 
 Bootstrap scripts and fish/fastfetch/neofetch configs for setting up a fresh Linux box.
 
@@ -164,11 +164,14 @@ To skip the menu entirely:
 | `-o`, `--only LIST` | Just these items or sets, comma or space separated |
 | `-x`, `--exclude LIST` | Drop these from the selection |
 | `-L`, `--list` | Show the items and sets, then exit |
+| `--update` | Explicitly enable the system update step (the default) |
+| `--no-update` | Skip system package updates and only install selections |
 | `-n`, `--dry-run` | Report what would happen, change nothing |
 | `-h`, `--help` | Show usage |
 
 ```bash
 ./install.sh --only core,tools     # no fish, no compiler toolchain
+./install.sh --no-update --only fish  # install fish without upgrading the host
 ./install.sh --all --exclude dev   # everything but the compiler toolchain
 ./setup.sh   --only fastfetch      # leave the fish config alone
 ./setup.sh   --list
@@ -185,6 +188,34 @@ can't quietly leave out a config you asked for.
 | `-y`, `--yes` | Assume yes for prompts (e.g. the login shell), and take everything |
 
 Changed your mind? `./restore.sh` puts back whatever `setup.sh` replaced.
+
+In a non-interactive run, setup deploys the selected files but leaves the login
+shell unchanged unless `--yes` is supplied explicitly. This prevents a piped
+or automated run from unexpectedly invoking `sudo` to edit `/etc/shells`.
+
+### Formatting enforcement recommendations
+
+Formatting should be enforced by file type rather than one formatter applied
+to the whole repository:
+
+- Normalize the Bash scripts once with a pinned `shfmt` version, then run
+  `shfmt -d` in CI on `*.sh` files. Review formatting-only changes separately
+  so behavior changes remain easy to audit.
+- Use Fish's native `fish_indent --check` for `config/fish/**/*.fish`; do not
+  run Bash formatters over Fish syntax.
+- Validate JSONC with Fastfetch and a JSONC-aware parser. Plain JSON formatters
+  may reject comments or rewrite schema-sensitive layout.
+- Use `yamllint` for workflow YAML, with repository-specific line-length and
+  truthy-value rules. Add a YAML formatter only after deciding whether its
+  rewrites are acceptable for GitHub Actions expressions.
+- Treat Nano and Neofetch configuration as syntax-specific formats. Prefer
+  parser/smoke validation and trailing-whitespace checks over generic
+  formatters that may change directive semantics.
+
+The current CI already performs ShellCheck, Bash/Fish syntax checks, Fastfetch
+runtime validation, YAML linting, and configuration smoke tests. The formatter
+checks should be enabled after the one-time normalization step to avoid
+mixing unrelated formatting churn with functional changes.
 
 ### Overview
 
